@@ -1,0 +1,10 @@
+{
+  "gui.rpgsetupscreen.title": "Character Creation",
+  "gui.rpgsetupscreen.spawn": "Select Spawn",
+  "gui.rpgsetupscreen.male": "Male",
+  "gui.rpgsetupscreen.female": "Female",
+  "gui.rpgsetupscreen.width": "Width: ",
+  "gui.rpgsetupscreen.height": "Height: ",
+  "gui.rpgsetupscreen.chest": "Chest: ",
+  "gui.rpgsetupscreen.next": "Next"
+}

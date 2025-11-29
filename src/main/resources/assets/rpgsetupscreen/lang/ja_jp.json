@@ -1,0 +1,10 @@
+{
+  "gui.rpgsetupscreen.title": "キャラクター作成",
+  "gui.rpgsetupscreen.spawn": "スポーン地点選択",
+  "gui.rpgsetupscreen.male": "男性",
+  "gui.rpgsetupscreen.female": "女性",
+  "gui.rpgsetupscreen.width": "横幅: ",
+  "gui.rpgsetupscreen.height": "身長: ",
+  "gui.rpgsetupscreen.chest": "胸囲: ",
+  "gui.rpgsetupscreen.next": "次へ"
+}
