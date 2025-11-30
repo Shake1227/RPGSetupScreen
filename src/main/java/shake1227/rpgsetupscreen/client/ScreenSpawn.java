@@ -10,13 +10,14 @@ import java.util.List;
 
 public class ScreenSpawn extends Screen {
     List<RPGCommands.SpawnData.Entry> list;
-    int g; float w, h, c;
+    int g; float w, h, c, cy, cs, ca;
 
-    public ScreenSpawn(List<RPGCommands.SpawnData.Entry> l, int g, float w, float h, float c) {
+    public ScreenSpawn(List<RPGCommands.SpawnData.Entry> l, int g, float w, float h, float c, float cy, float cs, float ca) {
         super(Component.translatable("gui.rpgsetupscreen.spawn"));
         this.list = l;
         if(this.list.isEmpty()) this.list.add(new RPGCommands.SpawnData.Entry("Initial Spawn Point", 0,0,0));
         this.g=g; this.w=w; this.h=h; this.c=c;
+        this.cy=cy; this.cs=cs; this.ca=ca;
     }
 
     @Override
@@ -35,7 +36,7 @@ public class ScreenSpawn extends Screen {
             int row = i / rowSize;
             int col = i % rowSize;
             Button b = Button.builder(Component.literal(e.name), btn -> {
-                RPGNetwork.CHANNEL.sendToServer(new RPGNetwork.PacketFinishSetup(e.name, g, w, h, c));
+                RPGNetwork.CHANNEL.sendToServer(new RPGNetwork.PacketFinishSetup(e.name, g, w, h, c, cy, cs, ca, ""));
                 this.minecraft.setScreen(null);
             }).bounds(startX + col*(btnW+pad), startY + row*(btnH+pad), btnW, btnH).build();
             this.addRenderableWidget(b);

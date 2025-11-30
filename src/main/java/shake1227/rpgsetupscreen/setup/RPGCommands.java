@@ -4,6 +4,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.commands.arguments.coordinates.Vec3Argument;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -36,7 +37,40 @@ public class RPGCommands {
                         .then(Commands.literal("gui")
                                 .executes(this::openGui))
                 )
+                .then(Commands.literal("resetup")
+                        .then(Commands.argument("target", EntityArgument.player())
+                                .then(Commands.argument("viewer", EntityArgument.player())
+                                        .executes(this::resetupPlayer)))
+                )
         );
+    }
+
+    private int resetupPlayer(CommandContext<CommandSourceStack> ctx) {
+        try {
+            ServerPlayer target = EntityArgument.getPlayer(ctx, "target");
+            ServerPlayer viewer = EntityArgument.getPlayer(ctx, "viewer");
+
+            target.getCapability(RPGCapability.INSTANCE).ifPresent(cap -> {
+                RPGNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> viewer),
+                        // 修正: 8つの引数を渡すように変更
+                        new RPGNetwork.PacketOpenEditor(
+                                target.getUUID(),
+                                cap.getGender(),
+                                cap.getWidth(),
+                                cap.getHeight(),
+                                cap.getChest(),
+                                cap.getChestY(),
+                                cap.getChestSep(),
+                                cap.getChestAng()
+                        ));
+            });
+
+            ctx.getSource().sendSuccess(() -> Component.literal("Opened setup for " + target.getName().getString() + " on " + viewer.getName().getString()), true);
+            return 1;
+        } catch (Exception e) {
+            ctx.getSource().sendFailure(Component.literal("Error: " + e.getMessage()));
+            return 0;
+        }
     }
 
     private int addLoc(CommandContext<CommandSourceStack> ctx) {
