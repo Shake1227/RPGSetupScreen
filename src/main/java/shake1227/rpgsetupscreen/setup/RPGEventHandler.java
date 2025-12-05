@@ -14,7 +14,6 @@ import shake1227.rpgsetupscreen.network.RPGNetwork;
 
 public class RPGEventHandler {
 
-    // このイベントがないとプレイヤーがデータを持てません
     @SubscribeEvent
     public void onAttachCapabilities(AttachCapabilitiesEvent<Entity> event) {
         if (event.getObject() instanceof Player) {
@@ -27,10 +26,24 @@ public class RPGEventHandler {
     @SubscribeEvent
     public void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
-            // データを持っていれば同期
+            // サーバー設定（制限）を同期
+            RPGNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
+                    new RPGNetwork.PacketSyncConfig(
+                            RPGConfig.ENABLE_GENDER.get(),
+                            RPGConfig.ENABLE_WIDTH.get(),
+                            RPGConfig.ENABLE_HEIGHT.get(),
+                            RPGConfig.ENABLE_CHEST_SIZE.get(),
+                            RPGConfig.ENABLE_CHEST_Y.get(),
+                            RPGConfig.ENABLE_CHEST_SEP.get(),
+                            RPGConfig.ENABLE_CHEST_ANG.get(),
+                            RPGConfig.ENABLE_PHYSICS.get()
+                    ));
+
+            // プレイヤーデータを同期
             player.getCapability(RPGCapability.INSTANCE).ifPresent(cap -> {
                 RPGNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
                         new RPGNetwork.PacketSyncData(
+                                player.getId(),
                                 cap.isFinished(),
                                 cap.getGender(),
                                 cap.getWidth(),
@@ -38,7 +51,8 @@ public class RPGEventHandler {
                                 cap.getChest(),
                                 cap.getChestY(),
                                 cap.getChestSep(),
-                                cap.getChestAng()
+                                cap.getChestAng(),
+                                cap.isPhysicsEnabled()
                         ));
 
                 if (!cap.isFinished()) {

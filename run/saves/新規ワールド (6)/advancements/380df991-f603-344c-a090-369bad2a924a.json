@@ -7,8 +7,10 @@
   },
   "minecraft:adventure/adventuring_time": {
     "criteria": {
+      "minecraft:beach": "2025-12-02 02:33:38 +0900",
       "minecraft:dark_forest": "2025-11-29 02:09:11 +0900",
-      "minecraft:river": "2025-11-29 02:09:21 +0900"
+      "minecraft:river": "2025-11-29 02:09:21 +0900",
+      "minecraft:old_growth_birch_forest": "2025-12-02 19:28:17 +0900"
     },
     "done": false
   },

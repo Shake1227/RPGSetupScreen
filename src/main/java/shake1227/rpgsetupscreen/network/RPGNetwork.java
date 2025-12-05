@@ -10,6 +10,7 @@ import net.minecraftforge.network.NetworkRegistry;
 import net.minecraftforge.network.PacketDistributor;
 import net.minecraftforge.network.simple.SimpleChannel;
 import shake1227.rpgsetupscreen.RPGSetupScreen;
+import shake1227.rpgsetupscreen.client.ClientConfigCache;
 import shake1227.rpgsetupscreen.client.ClientHooks;
 import shake1227.rpgsetupscreen.setup.RPGCapability;
 import shake1227.rpgsetupscreen.setup.RPGCommands;
@@ -22,7 +23,7 @@ import java.util.function.Supplier;
 public class RPGNetwork {
     public static SimpleChannel CHANNEL;
     private static int id = 0;
-    private static final String VER = "2"; // データ構造が変わったのでバージョン変更
+    private static final String VER = "5"; // パケット追加のため更新
 
     public static void register() {
         CHANNEL = NetworkRegistry.newSimpleChannel(new ResourceLocation(RPGSetupScreen.MODID, "net"), () -> VER, VER::equals, VER::equals);
@@ -33,24 +34,71 @@ public class RPGNetwork {
         CHANNEL.registerMessage(id++, PacketAdminAction.class, PacketAdminAction::enc, PacketAdminAction::dec, PacketAdminAction::handle);
         CHANNEL.registerMessage(id++, PacketRequestSync.class, (a,b)->{}, buf->new PacketRequestSync(), PacketRequestSync::handle);
         CHANNEL.registerMessage(id++, PacketOpenEditor.class, PacketOpenEditor::enc, PacketOpenEditor::dec, PacketOpenEditor::handle);
+        CHANNEL.registerMessage(id++, PacketTogglePhysics.class, (a,b)->{}, buf->new PacketTogglePhysics(), PacketTogglePhysics::handle);
+        // 新規パケット
+        CHANNEL.registerMessage(id++, PacketSyncConfig.class, PacketSyncConfig::enc, PacketSyncConfig::dec, PacketSyncConfig::handle);
     }
 
-    // --- 同期パケット ---
+    // --- 設定同期パケット ---
+    public static class PacketSyncConfig {
+        public boolean g, w, h, c, cy, cs, ca, phys;
+        public PacketSyncConfig(boolean g, boolean w, boolean h, boolean c, boolean cy, boolean cs, boolean ca, boolean phys) {
+            this.g=g; this.w=w; this.h=h; this.c=c; this.cy=cy; this.cs=cs; this.ca=ca; this.phys=phys;
+        }
+        public static void enc(PacketSyncConfig m, FriendlyByteBuf b) {
+            b.writeBoolean(m.g); b.writeBoolean(m.w); b.writeBoolean(m.h); b.writeBoolean(m.c);
+            b.writeBoolean(m.cy); b.writeBoolean(m.cs); b.writeBoolean(m.ca); b.writeBoolean(m.phys);
+        }
+        public static PacketSyncConfig dec(FriendlyByteBuf b) {
+            return new PacketSyncConfig(b.readBoolean(), b.readBoolean(), b.readBoolean(), b.readBoolean(),
+                    b.readBoolean(), b.readBoolean(), b.readBoolean(), b.readBoolean());
+        }
+        public static void handle(PacketSyncConfig m, Supplier<NetworkEvent.Context> c) {
+            c.get().enqueueWork(() -> ClientConfigCache.update(m.g, m.w, m.h, m.c, m.cy, m.cs, m.ca, m.phys));
+            c.get().setPacketHandled(true);
+        }
+    }
+
+    // --- 既存パケット ---
     public static class PacketSyncData {
-        public boolean f; public int g; public float w, h, c, cy, cs, ca;
-        public PacketSyncData(boolean f, int g, float w, float h, float c, float cy, float cs, float ca) {
-            this.f=f; this.g=g; this.w=w; this.h=h; this.c=c; this.cy=cy; this.cs=cs; this.ca=ca;
+        public int entityId;
+        public boolean f; public int g; public float w, h, c, cy, cs, ca; public boolean physics;
+
+        public PacketSyncData(int entityId, boolean f, int g, float w, float h, float c, float cy, float cs, float ca, boolean physics) {
+            this.entityId = entityId;
+            this.f=f; this.g=g; this.w=w; this.h=h; this.c=c; this.cy=cy; this.cs=cs; this.ca=ca; this.physics=physics;
         }
         public static void enc(PacketSyncData m, FriendlyByteBuf b) {
+            b.writeInt(m.entityId);
             b.writeBoolean(m.f); b.writeInt(m.g); b.writeFloat(m.w); b.writeFloat(m.h); b.writeFloat(m.c);
-            b.writeFloat(m.cy); b.writeFloat(m.cs); b.writeFloat(m.ca);
+            b.writeFloat(m.cy); b.writeFloat(m.cs); b.writeFloat(m.ca); b.writeBoolean(m.physics);
         }
         public static PacketSyncData dec(FriendlyByteBuf b) {
-            return new PacketSyncData(b.readBoolean(), b.readInt(), b.readFloat(), b.readFloat(), b.readFloat(), b.readFloat(), b.readFloat(), b.readFloat());
+            return new PacketSyncData(b.readInt(), b.readBoolean(), b.readInt(), b.readFloat(), b.readFloat(), b.readFloat(), b.readFloat(), b.readFloat(), b.readFloat(), b.readBoolean());
         }
         public static void handle(PacketSyncData m, Supplier<NetworkEvent.Context> c) {
-            c.get().enqueueWork(() -> ClientHooks.handleSync(m.f, m.g, m.w, m.h, m.c, m.cy, m.cs, m.ca));
+            c.get().enqueueWork(() -> ClientHooks.handleSync(m.entityId, m.f, m.g, m.w, m.h, m.c, m.cy, m.cs, m.ca, m.physics));
             c.get().setPacketHandled(true);
+        }
+    }
+
+    public static class PacketTogglePhysics {
+        public static void handle(PacketTogglePhysics m, Supplier<NetworkEvent.Context> ctx) {
+            ctx.get().enqueueWork(() -> {
+                ServerPlayer p = ctx.get().getSender();
+                if(p != null) {
+                    p.getCapability(RPGCapability.INSTANCE).ifPresent(cap -> {
+                        if (cap.getGender() == 1) {
+                            boolean newState = !cap.isPhysicsEnabled();
+                            cap.setPhysicsEnabled(newState);
+                            RPGNetwork.CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(()->p),
+                                    new PacketSyncData(p.getId(), true, cap.getGender(), cap.getWidth(), cap.getHeight(), cap.getChest(),
+                                            cap.getChestY(), cap.getChestSep(), cap.getChestAng(), newState));
+                        }
+                    });
+                }
+            });
+            ctx.get().setPacketHandled(true);
         }
     }
 
@@ -61,42 +109,40 @@ public class RPGNetwork {
         }
     }
 
-    // --- エディタ起動パケット ---
     public static class PacketOpenEditor {
-        public UUID targetId; public int g; public float w, h, c, cy, cs, ca;
-        public PacketOpenEditor(UUID targetId, int g, float w, float h, float c, float cy, float cs, float ca) {
-            this.targetId = targetId; this.g = g; this.w = w; this.h = h; this.c = c; this.cy=cy; this.cs=cs; this.ca=ca;
+        public UUID targetId; public int g; public float w, h, c, cy, cs, ca; public boolean physics;
+        public PacketOpenEditor(UUID targetId, int g, float w, float h, float c, float cy, float cs, float ca, boolean physics) {
+            this.targetId = targetId; this.g = g; this.w = w; this.h = h; this.c = c; this.cy=cy; this.cs=cs; this.ca=ca; this.physics=physics;
         }
         public static void enc(PacketOpenEditor m, FriendlyByteBuf b) {
             b.writeUUID(m.targetId); b.writeInt(m.g); b.writeFloat(m.w); b.writeFloat(m.h); b.writeFloat(m.c);
-            b.writeFloat(m.cy); b.writeFloat(m.cs); b.writeFloat(m.ca);
+            b.writeFloat(m.cy); b.writeFloat(m.cs); b.writeFloat(m.ca); b.writeBoolean(m.physics);
         }
         public static PacketOpenEditor dec(FriendlyByteBuf b) {
-            return new PacketOpenEditor(b.readUUID(), b.readInt(), b.readFloat(), b.readFloat(), b.readFloat(), b.readFloat(), b.readFloat(), b.readFloat());
+            return new PacketOpenEditor(b.readUUID(), b.readInt(), b.readFloat(), b.readFloat(), b.readFloat(), b.readFloat(), b.readFloat(), b.readFloat(), b.readBoolean());
         }
         public static void handle(PacketOpenEditor m, Supplier<NetworkEvent.Context> c) {
-            c.get().enqueueWork(() -> ClientHooks.openSetupForTarget(m.targetId, m.g, m.w, m.h, m.c, m.cy, m.cs, m.ca));
+            c.get().enqueueWork(() -> ClientHooks.openSetupForTarget(m.targetId, m.g, m.w, m.h, m.c, m.cy, m.cs, m.ca, m.physics));
             c.get().setPacketHandled(true);
         }
     }
 
-    // --- 設定完了・保存パケット ---
     public static class PacketFinishSetup {
-        public String loc; public int g; public float w, h, c, cy, cs, ca;
+        public String loc; public int g; public float w, h, c, cy, cs, ca; public boolean physics;
         public String targetUUID;
 
-        public PacketFinishSetup(String loc, int g, float w, float h, float c, float cy, float cs, float ca, String targetUUID) {
+        public PacketFinishSetup(String loc, int g, float w, float h, float c, float cy, float cs, float ca, boolean physics, String targetUUID) {
             this.loc=loc; this.g=g; this.w=w; this.h=h; this.c=c;
-            this.cy=cy; this.cs=cs; this.ca=ca;
+            this.cy=cy; this.cs=cs; this.ca=ca; this.physics=physics;
             this.targetUUID = targetUUID;
         }
         public static void enc(PacketFinishSetup m, FriendlyByteBuf b) {
             b.writeUtf(m.loc); b.writeInt(m.g); b.writeFloat(m.w); b.writeFloat(m.h); b.writeFloat(m.c);
-            b.writeFloat(m.cy); b.writeFloat(m.cs); b.writeFloat(m.ca);
+            b.writeFloat(m.cy); b.writeFloat(m.cs); b.writeFloat(m.ca); b.writeBoolean(m.physics);
             b.writeUtf(m.targetUUID);
         }
         public static PacketFinishSetup dec(FriendlyByteBuf b) {
-            return new PacketFinishSetup(b.readUtf(), b.readInt(), b.readFloat(), b.readFloat(), b.readFloat(), b.readFloat(), b.readFloat(), b.readFloat(), b.readUtf());
+            return new PacketFinishSetup(b.readUtf(), b.readInt(), b.readFloat(), b.readFloat(), b.readFloat(), b.readFloat(), b.readFloat(), b.readFloat(), b.readBoolean(), b.readUtf());
         }
         public static void handle(PacketFinishSetup m, Supplier<NetworkEvent.Context> ctx) {
             ctx.get().enqueueWork(() -> {
@@ -111,16 +157,22 @@ public class RPGNetwork {
 
                 final ServerPlayer p = targetPlayer;
                 p.getCapability(RPGCapability.INSTANCE).ifPresent(cap -> {
+                    boolean wasFinished = cap.isFinished();
+
                     cap.setGender(m.g); cap.setWidth(m.w); cap.setHeight(m.h); cap.setChest(m.c);
                     cap.setChestY(m.cy); cap.setChestSep(m.cs); cap.setChestAng(m.ca);
+                    cap.setPhysicsEnabled(m.physics);
                     cap.setFinished(true);
 
                     RPGNetwork.CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(()->p),
-                            new PacketSyncData(true, m.g, m.w, m.h, m.c, m.cy, m.cs, m.ca));
+                            new PacketSyncData(p.getId(), true, m.g, m.w, m.h, m.c, m.cy, m.cs, m.ca, m.physics));
+
+                    if (!wasFinished && p.gameMode.getGameModeForPlayer() == GameType.SPECTATOR) {
+                        p.setGameMode(GameType.SURVIVAL);
+                    }
                 });
 
                 if(!m.loc.isEmpty()) {
-                    p.setGameMode(GameType.SURVIVAL);
                     RPGCommands.SpawnData data = RPGCommands.SpawnData.get(p.serverLevel());
                     var opt = data.list.stream().filter(e -> e.name.equals(m.loc)).findFirst();
                     if(opt.isPresent()) p.teleportTo(opt.get().x, opt.get().y, opt.get().z);
@@ -141,8 +193,8 @@ public class RPGNetwork {
                 if(p != null) {
                     p.getCapability(RPGCapability.INSTANCE).ifPresent(cap -> {
                         RPGNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(()->p),
-                                new PacketSyncData(cap.isFinished(), cap.getGender(), cap.getWidth(), cap.getHeight(), cap.getChest(),
-                                        cap.getChestY(), cap.getChestSep(), cap.getChestAng()));
+                                new PacketSyncData(p.getId(), cap.isFinished(), cap.getGender(), cap.getWidth(), cap.getHeight(), cap.getChest(),
+                                        cap.getChestY(), cap.getChestSep(), cap.getChestAng(), cap.isPhysicsEnabled()));
                     });
                 }
             });
@@ -150,7 +202,6 @@ public class RPGNetwork {
         }
     }
 
-    // PacketAdminGui, PacketAdminAction は変更なし
     public static class PacketAdminGui {
         public List<RPGCommands.SpawnData.Entry> list;
         public PacketAdminGui(List<RPGCommands.SpawnData.Entry> l) { this.list=l; }

@@ -2,27 +2,46 @@ package shake1227.rpgsetupscreen.client;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.client.player.RemotePlayer;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.Mth;
 import net.minecraftforge.client.gui.widget.ForgeSlider;
 import shake1227.rpgsetupscreen.network.RPGNetwork;
 import shake1227.rpgsetupscreen.setup.RPGCapability;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 public class ScreenSetup extends Screen {
     private int gender = 0;
     private float valW = 1.0f, valH = 1.0f, valC = 0.0f;
     private float valY = 0.0f, valSep = 0.0f, valAng = 0.0f;
+    private boolean physicsEnabled = true;
+
     private ForgeSlider sC, sY, sSep, sAng;
+    private Button btnMale, btnFemale, btnPhysics;
 
     private String targetUUID = "";
+    private RemotePlayer previewPlayer;
+
+    private long openTime;
+    private static final int ANIM_DURATION = 600;
+    private final List<Integer> initialYPositions = new ArrayList<>();
+
+    private int titleY = 20;
 
     public ScreenSetup() { super(Component.translatable("gui.rpgsetupscreen.title")); }
 
-    public void setEditTarget(UUID targetId, int g, float w, float h, float c, float cy, float cs, float ca) {
+    public void setEditTarget(UUID targetId, int g, float w, float h, float c, float cy, float cs, float ca, boolean physics) {
         this.targetUUID = targetId.toString();
+        loadDefaults(g, w, h, c, cy, cs, ca, physics);
+    }
+
+    public void loadDefaults(int g, float w, float h, float c, float cy, float cs, float ca, boolean physics) {
         this.gender = g;
         this.valW = w;
         this.valH = h;
@@ -30,65 +49,116 @@ public class ScreenSetup extends Screen {
         this.valY = cy;
         this.valSep = cs;
         this.valAng = ca;
+        this.physicsEnabled = physics;
+    }
+
+    private float getForcedScale() {
+        return 3.0f / (float)this.minecraft.getWindow().getGuiScale();
     }
 
     @Override
     protected void init() {
-        int cx = this.width / 2;
-        int cy = this.height / 2;
+        this.openTime = System.currentTimeMillis();
+        this.initialYPositions.clear();
 
-        this.addRenderableWidget(Button.builder(Component.translatable("gui.rpgsetupscreen.male"), b -> {
+        float scale = getForcedScale();
+        int vWidth = (int)(this.width / scale);
+        int vHeight = (int)(this.height / scale);
+
+        int cx = vWidth / 2;
+        int cy = vHeight / 2;
+
+        if (this.minecraft != null && this.minecraft.level != null) {
+            this.previewPlayer = new RemotePlayer(this.minecraft.level, this.minecraft.player.getGameProfile()) {
+                @Override public boolean isSpectator() { return false; }
+            };
+            this.previewPlayer.setInvisible(false);
+            this.previewPlayer.yBodyRot = 0.0f;
+            this.previewPlayer.yHeadRot = 0.0f;
+            this.previewPlayer.setYRot(0.0f);
+        }
+
+        // 性別
+        btnMale = Button.builder(Component.translatable("gui.rpgsetupscreen.male"), b -> {
             gender = 0; setSlidersVisible(false); updatePreview();
-        }).bounds(cx - 105, cy - 80, 100, 20).build());
+        }).bounds(cx - 105, cy - 80, 100, 20).build();
+        if (!ClientConfigCache.enableGender) btnMale.active = false;
+        this.addRenderableWidget(btnMale);
 
-        this.addRenderableWidget(Button.builder(Component.translatable("gui.rpgsetupscreen.female"), b -> {
+        btnFemale = Button.builder(Component.translatable("gui.rpgsetupscreen.female"), b -> {
             gender = 1; setSlidersVisible(true); updatePreview();
-        }).bounds(cx + 5, cy - 80, 100, 20).build());
+        }).bounds(cx + 5, cy - 80, 100, 20).build();
+        if (!ClientConfigCache.enableGender) btnFemale.active = false;
+        this.addRenderableWidget(btnFemale);
 
-        this.addRenderableWidget(new ForgeSlider(cx - 100, cy - 50, 200, 20, Component.translatable("gui.rpgsetupscreen.width"), Component.empty(), 0.5, 1.5, valW, 0.01, 2, true) {
+        // 基本サイズ
+        ForgeSlider sW = new ForgeSlider(cx - 100, cy - 50, 200, 20, Component.translatable("gui.rpgsetupscreen.width"), Component.empty(), 0.5, 1.5, valW, 0.01, 2, true) {
             @Override protected void applyValue() { valW = (float)getValue(); updatePreview(); }
-        });
-        this.addRenderableWidget(new ForgeSlider(cx - 100, cy - 25, 200, 20, Component.translatable("gui.rpgsetupscreen.height"), Component.empty(), 0.5, 1.5, valH, 0.01, 2, true) {
-            @Override protected void applyValue() { valH = (float)getValue(); updatePreview(); }
-        });
+        };
+        if (!ClientConfigCache.enableWidth) sW.active = false;
+        this.addRenderableWidget(sW);
 
+        ForgeSlider sH = new ForgeSlider(cx - 100, cy - 25, 200, 20, Component.translatable("gui.rpgsetupscreen.height"), Component.empty(), 0.5, 1.5, valH, 0.01, 2, true) {
+            @Override protected void applyValue() { valH = (float)getValue(); updatePreview(); }
+        };
+        if (!ClientConfigCache.enableHeight) sH.active = false;
+        this.addRenderableWidget(sH);
+
+        // 胸
         sC = new ForgeSlider(cx - 100, cy, 200, 20, Component.translatable("gui.rpgsetupscreen.chest"), Component.empty(), 0.0, 1.0, valC, 0.01, 2, true) {
             @Override protected void applyValue() { valC = (float)getValue(); updatePreview(); }
         };
+        if (!ClientConfigCache.enableChest) sC.active = false;
         this.addRenderableWidget(sC);
 
-        // --- 詳細設定 (可動域を制限) ---
-        // Y位置: -0.1 (少し上) ~ 0.3 (お腹あたり)
-        sY = new ForgeSlider(cx - 100, cy + 25, 200, 20, Component.literal("Chest Pos Y"), Component.empty(), -0.1, 0.3, valY, 0.01, 2, true) {
+        sY = new ForgeSlider(cx - 100, cy + 25, 200, 20, Component.translatable("gui.rpgsetupscreen.chest_y"), Component.empty(), -0.1, 0.3, valY, 0.01, 2, true) {
             @Override protected void applyValue() { valY = (float)getValue(); updatePreview(); }
         };
+        if (!ClientConfigCache.enableChestY) sY.active = false;
         this.addRenderableWidget(sY);
 
-        // 間隔: 0.0 (密着) ~ 0.25 (腕の付け根あたり)
-        sSep = new ForgeSlider(cx - 100, cy + 50, 200, 20, Component.literal("Chest Sep"), Component.empty(), 0.0, 0.25, valSep, 0.01, 2, true) {
+        sSep = new ForgeSlider(cx - 100, cy + 50, 200, 20, Component.translatable("gui.rpgsetupscreen.chest_sep"), Component.empty(), 0.0, 0.25, valSep, 0.01, 2, true) {
             @Override protected void applyValue() { valSep = (float)getValue(); updatePreview(); }
         };
+        if (!ClientConfigCache.enableChestSep) sSep.active = false;
         this.addRenderableWidget(sSep);
 
-        // 角度: 0.0 ~ 45.0度
-        sAng = new ForgeSlider(cx - 100, cy + 75, 200, 20, Component.literal("Chest Angle"), Component.empty(), 0.0, 45.0, valAng, 0.1, 1, true) {
+        sAng = new ForgeSlider(cx - 100, cy + 75, 200, 20, Component.translatable("gui.rpgsetupscreen.chest_ang"), Component.empty(), 0.0, 45.0, valAng, 0.1, 1, true) {
             @Override protected void applyValue() { valAng = (float)getValue(); updatePreview(); }
         };
+        if (!ClientConfigCache.enableChestAng) sAng.active = false;
         this.addRenderableWidget(sAng);
+
+        btnPhysics = Button.builder(Component.translatable("gui.rpgsetupscreen.physics", physicsEnabled ? "ON" : "OFF"), b -> {
+            physicsEnabled = !physicsEnabled;
+            b.setMessage(Component.translatable("gui.rpgsetupscreen.physics", physicsEnabled ? "ON" : "OFF"));
+            updatePreview();
+        }).bounds(cx + 105, cy, 80, 20).build();
+        if (!ClientConfigCache.enablePhysics) btnPhysics.active = false;
+        this.addRenderableWidget(btnPhysics);
 
         setSlidersVisible(gender == 1);
 
-        Component btnText = targetUUID.isEmpty() ? Component.translatable("gui.rpgsetupscreen.next") : Component.literal("Save");
+        Component btnText = targetUUID.isEmpty() ? Component.translatable("gui.rpgsetupscreen.next") : Component.translatable("gui.rpgsetupscreen.save");
         this.addRenderableWidget(Button.builder(btnText, b -> {
+            ClientSettingsCache.save(gender, valW, valH, valC, valY, valSep, valAng, physicsEnabled);
+
             if (targetUUID.isEmpty()) {
+                ClientHooks.setPendingSetupData(gender, valW, valH, valC, valY, valSep, valAng, physicsEnabled);
                 RPGNetwork.CHANNEL.sendToServer(new RPGNetwork.PacketAdminGui(null));
             } else {
-                RPGNetwork.CHANNEL.sendToServer(new RPGNetwork.PacketFinishSetup("", gender, valW, valH, valC, valY, valSep, valAng, targetUUID));
+                RPGNetwork.CHANNEL.sendToServer(new RPGNetwork.PacketFinishSetup("", gender, valW, valH, valC, valY, valSep, valAng, physicsEnabled, targetUUID));
                 this.onClose();
             }
         }).bounds(cx - 50, cy + 105, 100, 20).build());
 
         updatePreview();
+
+        for (var w : this.renderables) {
+            if (w instanceof AbstractWidget aw) {
+                initialYPositions.add(aw.getY());
+            }
+        }
     }
 
     private void setSlidersVisible(boolean visible) {
@@ -96,30 +166,103 @@ public class ScreenSetup extends Screen {
         sY.visible = visible;
         sSep.visible = visible;
         sAng.visible = visible;
+        btnPhysics.visible = visible;
     }
 
     private void updatePreview() {
-        if(this.minecraft.player != null) {
-            this.minecraft.player.getCapability(RPGCapability.INSTANCE).ifPresent(c -> {
+        if(this.previewPlayer != null) {
+            this.previewPlayer.getCapability(RPGCapability.INSTANCE).ifPresent(c -> {
                 c.setGender(gender); c.setWidth(valW); c.setHeight(valH);
                 c.setChest(valC); c.setChestY(valY); c.setChestSep(valSep); c.setChestAng(valAng);
+                c.setPhysicsEnabled(physicsEnabled);
             });
         }
     }
 
     @Override
-    public void render(GuiGraphics g, int mx, int my, float pt) {
-        this.renderBackground(g);
-        super.render(g, mx, my, pt);
-
-        int previewX = this.width / 5;
-        int previewY = this.height / 2 + 80;
-        InventoryScreen.renderEntityInInventoryFollowsMouse(g, previewX, previewY, 70, (float)(previewX) - mx, (float)(previewY - 120) - my, this.minecraft.player);
-
-        if (!targetUUID.isEmpty()) {
-            g.drawCenteredString(this.font, "Editing Target Mode", this.width / 2, 20, 0xFF5555);
-        }
+    public boolean mouseClicked(double mx, double my, int btn) {
+        if (this.minecraft.options.keyInventory.matches(btn, 0)) return true;
+        float scale = getForcedScale();
+        return super.mouseClicked(mx / scale, my / scale, btn);
     }
 
-    @Override public boolean shouldCloseOnEsc() { return targetUUID.isEmpty(); }
+    @Override
+    public boolean mouseReleased(double mx, double my, int btn) {
+        float scale = getForcedScale();
+        return super.mouseReleased(mx / scale, my / scale, btn);
+    }
+
+    @Override
+    public boolean mouseDragged(double mx, double my, int btn, double dx, double dy) {
+        float scale = getForcedScale();
+        return super.mouseDragged(mx / scale, my / scale, btn, dx / scale, dy / scale);
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (this.minecraft.options.keyInventory.matches(keyCode, scanCode)) return true;
+        if (keyCode == 256 && !this.shouldCloseOnEsc()) return true;
+        return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    @Override
+    public void render(GuiGraphics g, int mx, int my, float pt) {
+        if (targetUUID.isEmpty()) {
+            this.renderDirtBackground(g);
+        } else {
+            g.fill(0, 0, this.width, this.height, 0xAA000000);
+        }
+
+        float scale = getForcedScale();
+        int vWidth = (int)(this.width / scale);
+        int vHeight = (int)(this.height / scale);
+
+        g.pose().pushPose();
+        g.pose().scale(scale, scale, 1.0f);
+
+        LogoRenderer.render(g, vWidth);
+
+        Component titleComp = targetUUID.isEmpty() ? this.title : Component.translatable("gui.rpgsetupscreen.editing_target", targetUUID);
+        g.drawCenteredString(this.font, titleComp, vWidth / 2, this.titleY, 0xFFFFFF);
+
+        float t = Mth.clamp((System.currentTimeMillis() - openTime) / (float)ANIM_DURATION, 0f, 1f);
+
+        int widgetIndex = 0;
+        for (var r : this.renderables) {
+            if (r instanceof AbstractWidget w && widgetIndex < initialYPositions.size()) {
+                float delayT = Mth.clamp((System.currentTimeMillis() - openTime - (widgetIndex * 30L)) / (float)ANIM_DURATION, 0f, 1f);
+                float itemEase = backOut(delayT);
+                int targetY = initialYPositions.get(widgetIndex);
+                int startOffsetY = 30;
+                w.setY((int) (targetY + startOffsetY * (1 - itemEase)));
+                w.setAlpha(itemEase);
+                widgetIndex++;
+            }
+        }
+
+        super.render(g, (int)(mx / scale), (int)(my / scale), pt);
+
+        // 警告文を画面下部に表示
+        if (targetUUID.isEmpty()) {
+            g.drawCenteredString(this.font, Component.translatable("gui.rpgsetupscreen.warning"), vWidth / 2, vHeight - 30, 0xFF5555);
+        }
+
+        int previewX = vWidth / 5;
+        int previewY = vHeight / 2 + 50;
+        int previewScale = 60;
+
+        if (this.previewPlayer != null) {
+            InventoryScreen.renderEntityInInventoryFollowsMouse(g, previewX, previewY, previewScale, (float)(previewX) - (float)(mx/scale), (float)(previewY - 120) - (float)(my/scale), this.previewPlayer);
+        }
+
+        g.pose().popPose();
+    }
+
+    private float backOut(float t) {
+        float c1 = 1.70158f;
+        float c3 = c1 + 1;
+        return 1 + c3 * (float)Math.pow(t - 1, 3) + c1 * (float)Math.pow(t - 1, 2);
+    }
+
+    @Override public boolean shouldCloseOnEsc() { return !targetUUID.isEmpty(); }
 }

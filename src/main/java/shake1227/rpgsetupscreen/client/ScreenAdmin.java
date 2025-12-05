@@ -13,31 +13,81 @@ public class ScreenAdmin extends Screen {
     List<RPGCommands.SpawnData.Entry> list;
     EditBox nameInput;
 
-    public ScreenAdmin(List<RPGCommands.SpawnData.Entry> l) { super(Component.literal("Spawn Manager")); this.list=l; }
+    public ScreenAdmin(List<RPGCommands.SpawnData.Entry> l) {
+        super(Component.literal("RPG Setup Admin"));
+        this.list = l;
+    }
+
+    private float getForcedScale() {
+        return 3.0f / (float)this.minecraft.getWindow().getGuiScale();
+    }
 
     @Override
     protected void init() {
-        int cx = this.width / 2;
-        nameInput = new EditBox(font, cx-100, 30, 150, 20, Component.literal("Name"));
-        addRenderableWidget(nameInput);
+        float scale = getForcedScale();
+        int vWidth = (int)(this.width / scale);
+        int vHeight = (int)(this.height / scale);
+        int cx = vWidth / 2;
+        int cy = vHeight / 2 - 30;
 
-        addRenderableWidget(Button.builder(Component.literal("Add"), b -> {
-            if(!nameInput.getValue().isEmpty()) RPGNetwork.CHANNEL.sendToServer(new RPGNetwork.PacketAdminAction(0, nameInput.getValue()));
-        }).bounds(cx+60, 30, 40, 20).build());
+        nameInput = new EditBox(this.font, cx - 100, cy - 20, 200, 20, Component.literal("Name"));
+        this.addRenderableWidget(nameInput);
 
-        int y = 60;
-        for(var e : list) {
-            addRenderableWidget(Button.builder(Component.literal(e.name + " ("+ (int)e.x +","+ (int)e.y +","+ (int)e.z +")"), b->{}).bounds(cx-100, y, 150, 20).build());
-            addRenderableWidget(Button.builder(Component.literal("X"), b->{
-                RPGNetwork.CHANNEL.sendToServer(new RPGNetwork.PacketAdminAction(1, e.name));
-            }).bounds(cx+60, y, 20, 20).build());
-            y+=25;
+        this.addRenderableWidget(Button.builder(Component.literal("Add Current Location"), b -> {
+            String n = nameInput.getValue();
+            if(!n.isEmpty()) {
+                RPGNetwork.CHANNEL.sendToServer(new RPGNetwork.PacketAdminAction(0, n));
+                nameInput.setValue("");
+            }
+        }).bounds(cx - 100, cy + 5, 200, 20).build());
+
+        int startY = cy + 40;
+        if(list != null) {
+            for(int i=0; i<list.size(); i++) {
+                RPGCommands.SpawnData.Entry e = list.get(i);
+                this.addRenderableWidget(Button.builder(Component.literal("Remove: " + e.name), b -> {
+                    RPGNetwork.CHANNEL.sendToServer(new RPGNetwork.PacketAdminAction(1, e.name));
+                }).bounds(cx - 100, startY + i*25, 200, 20).build());
+            }
         }
     }
 
     @Override
+    public boolean mouseClicked(double mx, double my, int btn) {
+        float scale = getForcedScale();
+        return super.mouseClicked(mx / scale, my / scale, btn);
+    }
+
+    @Override
+    public boolean mouseReleased(double mx, double my, int btn) {
+        float scale = getForcedScale();
+        return super.mouseReleased(mx / scale, my / scale, btn);
+    }
+
+    @Override
+    public boolean charTyped(char code, int modifiers) {
+        return super.charTyped(code, modifiers);
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if(super.keyPressed(keyCode, scanCode, modifiers)) return true;
+        return false;
+    }
+
+    @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
-        renderBackground(g);
-        super.render(g, mx, my, pt);
+        this.renderBackground(g);
+
+        float scale = getForcedScale();
+        int vWidth = (int)(this.width / scale);
+
+        g.pose().pushPose();
+        g.pose().scale(scale, scale, 1.0f);
+
+        super.render(g, (int)(mx/scale), (int)(my/scale), pt);
+        g.drawCenteredString(this.font, this.title, vWidth / 2, 20, 0xFFFFFF);
+
+        g.pose().popPose();
     }
 }

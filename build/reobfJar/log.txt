@@ -135,15 +135,26 @@ Reading Input: D:\MODProject\RPGSetupScreen\build\libs\rpgsetupscreen-1.20.1-1.0
 Adding input to inheritance map
 Processing entries
 Conflicting propagated mapping for shake1227/rpgsetupscreen/client/PlayerChestLayer/render(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;ILnet/minecraft/world/entity/Entity;FFFFFF)V from net/minecraft/client/renderer/entity/layers/RenderLayer/render(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;ILnet/minecraft/world/entity/Entity;FFFFFF)V: render -> m_6494_
-Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenSpawn/render(Lnet/minecraft/client/gui/GuiGraphics;IIF)V from net/minecraft/client/gui/screens/Screen/render(Lnet/minecraft/client/gui/GuiGraphics;IIF)V: render -> m_88315_
-Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenSpawn/init()V from net/minecraft/client/gui/screens/Screen/init()V: init -> m_7856_
+Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenAdmin/keyPressed(III)Z from net/minecraft/client/gui/screens/Screen/keyPressed(III)Z: keyPressed -> m_7933_
+Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenSetup/keyPressed(III)Z from net/minecraft/client/gui/screens/Screen/keyPressed(III)Z: keyPressed -> m_7933_
 Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenAdmin/render(Lnet/minecraft/client/gui/GuiGraphics;IIF)V from net/minecraft/client/gui/screens/Screen/render(Lnet/minecraft/client/gui/GuiGraphics;IIF)V: render -> m_88315_
+Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenSpawn/render(Lnet/minecraft/client/gui/GuiGraphics;IIF)V from net/minecraft/client/gui/screens/Screen/render(Lnet/minecraft/client/gui/GuiGraphics;IIF)V: render -> m_88315_
 Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenAdmin/init()V from net/minecraft/client/gui/screens/Screen/init()V: init -> m_7856_
-Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenSpawn/shouldCloseOnEsc()Z from net/minecraft/client/gui/screens/Screen/shouldCloseOnEsc()Z: shouldCloseOnEsc -> m_6913_
-Conflicting propagated mapping for shake1227/rpgsetupscreen/setup/RPGCommands$SpawnData/save(Lnet/minecraft/nbt/CompoundTag;)Lnet/minecraft/nbt/CompoundTag; from net/minecraft/world/level/saveddata/SavedData/save(Lnet/minecraft/nbt/CompoundTag;)Lnet/minecraft/nbt/CompoundTag;: save -> m_7176_
 Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenSetup/render(Lnet/minecraft/client/gui/GuiGraphics;IIF)V from net/minecraft/client/gui/screens/Screen/render(Lnet/minecraft/client/gui/GuiGraphics;IIF)V: render -> m_88315_
-Conflicting propagated mapping for net/minecraftforge/client/gui/widget/ForgeSlider/updateMessage()V from net/minecraft/client/gui/components/AbstractSliderButton/updateMessage()V: updateMessage -> m_5695_
+Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenSpawn/init()V from net/minecraft/client/gui/screens/Screen/init()V: init -> m_7856_
 Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenSetup/init()V from net/minecraft/client/gui/screens/Screen/init()V: init -> m_7856_
+Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenAdmin/mouseClicked(DDI)Z from net/minecraft/client/gui/components/events/ContainerEventHandler/mouseClicked(DDI)Z: mouseClicked -> m_6375_
+Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenSetup/mouseClicked(DDI)Z from net/minecraft/client/gui/components/events/ContainerEventHandler/mouseClicked(DDI)Z: mouseClicked -> m_6375_
+Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenAdmin/charTyped(CI)Z from net/minecraft/client/gui/components/events/ContainerEventHandler/charTyped(CI)Z: charTyped -> m_5534_
+Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenSpawn/mouseClicked(DDI)Z from net/minecraft/client/gui/components/events/ContainerEventHandler/mouseClicked(DDI)Z: mouseClicked -> m_6375_
+Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenAdmin/mouseReleased(DDI)Z from net/minecraft/client/gui/components/events/ContainerEventHandler/mouseReleased(DDI)Z: mouseReleased -> m_6348_
+Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenSpawn/shouldCloseOnEsc()Z from net/minecraft/client/gui/screens/Screen/shouldCloseOnEsc()Z: shouldCloseOnEsc -> m_6913_
+Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenSetup/mouseDragged(DDIDD)Z from net/minecraft/client/gui/components/events/ContainerEventHandler/mouseDragged(DDIDD)Z: mouseDragged -> m_7979_
+Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenSpawn/mouseReleased(DDI)Z from net/minecraft/client/gui/components/events/ContainerEventHandler/mouseReleased(DDI)Z: mouseReleased -> m_6348_
+Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenSetup/shouldCloseOnEsc()Z from net/minecraft/client/gui/screens/Screen/shouldCloseOnEsc()Z: shouldCloseOnEsc -> m_6913_
+Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenSetup/mouseReleased(DDI)Z from net/minecraft/client/gui/components/events/ContainerEventHandler/mouseReleased(DDI)Z: mouseReleased -> m_6348_
+Conflicting propagated mapping for shake1227/rpgsetupscreen/setup/RPGCommands$SpawnData/save(Lnet/minecraft/nbt/CompoundTag;)Lnet/minecraft/nbt/CompoundTag; from net/minecraft/world/level/saveddata/SavedData/save(Lnet/minecraft/nbt/CompoundTag;)Lnet/minecraft/nbt/CompoundTag;: save -> m_7176_
+Conflicting propagated mapping for net/minecraftforge/client/gui/widget/ForgeSlider/updateMessage()V from net/minecraft/client/gui/components/AbstractSliderButton/updateMessage()V: updateMessage -> m_5695_
 Conflicting propagated mapping for net/minecraftforge/client/gui/widget/ForgeSlider/setValue(D)V from net/minecraft/client/gui/components/AbstractSliderButton/setValue(D)V: setValue -> m_93611_
 Conflicting propagated mapping for net/minecraftforge/client/gui/widget/ForgeSlider/keyPressed(III)Z from net/minecraft/client/gui/components/AbstractSliderButton/keyPressed(III)Z: keyPressed -> m_7933_
 Conflicting propagated mapping for net/minecraftforge/client/gui/widget/ForgeSlider/onClick(DD)V from net/minecraft/client/gui/components/AbstractSliderButton/onClick(DD)V: onClick -> m_5716_
@@ -151,11 +162,14 @@ Conflicting propagated mapping for net/minecraftforge/client/gui/widget/ForgeSli
 Conflicting propagated mapping for net/minecraftforge/client/gui/widget/ForgeSlider/setValueFromMouse(D)V from net/minecraft/client/gui/components/AbstractSliderButton/setValueFromMouse(D)V: setValueFromMouse -> m_93585_
 Conflicting propagated mapping for net/minecraftforge/client/gui/widget/ForgeSlider/onDrag(DDDD)V from net/minecraft/client/gui/components/AbstractSliderButton/onDrag(DDDD)V: onDrag -> m_7212_
 Conflicting propagated mapping for net/minecraftforge/client/gui/widget/ForgeSlider/applyValue()V from net/minecraft/client/gui/components/AbstractSliderButton/applyValue()V: applyValue -> m_5697_
-Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenSetup/shouldCloseOnEsc()Z from net/minecraft/client/gui/screens/Screen/shouldCloseOnEsc()Z: shouldCloseOnEsc -> m_6913_
-Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenSetup$1/applyValue()V from net/minecraftforge/client/gui/widget/ForgeSlider/applyValue()V: applyValue -> m_5697_
-Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenSetup$3/applyValue()V from net/minecraftforge/client/gui/widget/ForgeSlider/applyValue()V: applyValue -> m_5697_
+Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenSetup$4/applyValue()V from net/minecraftforge/client/gui/widget/ForgeSlider/applyValue()V: applyValue -> m_5697_
+Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenSetup$6/applyValue()V from net/minecraftforge/client/gui/widget/ForgeSlider/applyValue()V: applyValue -> m_5697_
 Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenSetup$2/applyValue()V from net/minecraftforge/client/gui/widget/ForgeSlider/applyValue()V: applyValue -> m_5697_
+Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenSetup$5/applyValue()V from net/minecraftforge/client/gui/widget/ForgeSlider/applyValue()V: applyValue -> m_5697_
+Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenSetup$7/applyValue()V from net/minecraftforge/client/gui/widget/ForgeSlider/applyValue()V: applyValue -> m_5697_
+Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenSetup$3/applyValue()V from net/minecraftforge/client/gui/widget/ForgeSlider/applyValue()V: applyValue -> m_5697_
 Conflicting propagated mapping for net/minecraft/world/entity/LivingEntity/lambda$addAdditionalSaveData$3(Lnet/minecraft/nbt/CompoundTag;Lnet/minecraft/nbt/Tag;)V from net/minecraft/world/entity/player/Player/lambda$addAdditionalSaveData$3(Lnet/minecraft/nbt/CompoundTag;Lnet/minecraft/nbt/Tag;)V: lambda$addAdditionalSaveData$3 -> m_219754_
+Conflicting propagated mapping for shake1227/rpgsetupscreen/client/ScreenSetup$1/isSpectator()Z from net/minecraft/client/player/AbstractClientPlayer/isSpectator()Z: isSpectator -> m_5833_
 Adding extras
 Sorting
 Writing Output: D:\MODProject\RPGSetupScreen\build\reobfJar\output.jar
@@ -172,13 +186,24 @@ Writing Output: D:\MODProject\RPGSetupScreen\build\reobfJar\output.jar
   shake1227/rpgsetupscreen/
   shake1227/rpgsetupscreen/RPGSetupScreen.class
   shake1227/rpgsetupscreen/client/
+  shake1227/rpgsetupscreen/client/ClientConfigCache.class
   shake1227/rpgsetupscreen/client/ClientHooks$ModBusEvents.class
+  shake1227/rpgsetupscreen/client/ClientHooks$PhysicsState.class
   shake1227/rpgsetupscreen/client/ClientHooks.class
+  shake1227/rpgsetupscreen/client/ClientSettingsCache$1.class
+  shake1227/rpgsetupscreen/client/ClientSettingsCache$CachedData.class
+  shake1227/rpgsetupscreen/client/ClientSettingsCache.class
+  shake1227/rpgsetupscreen/client/KeyInit.class
+  shake1227/rpgsetupscreen/client/LogoRenderer.class
   shake1227/rpgsetupscreen/client/PlayerChestLayer.class
   shake1227/rpgsetupscreen/client/ScreenAdmin.class
   shake1227/rpgsetupscreen/client/ScreenSetup$1.class
   shake1227/rpgsetupscreen/client/ScreenSetup$2.class
   shake1227/rpgsetupscreen/client/ScreenSetup$3.class
+  shake1227/rpgsetupscreen/client/ScreenSetup$4.class
+  shake1227/rpgsetupscreen/client/ScreenSetup$5.class
+  shake1227/rpgsetupscreen/client/ScreenSetup$6.class
+  shake1227/rpgsetupscreen/client/ScreenSetup$7.class
   shake1227/rpgsetupscreen/client/ScreenSetup.class
   shake1227/rpgsetupscreen/client/ScreenSpawn.class
   shake1227/rpgsetupscreen/network/
@@ -188,7 +213,9 @@ Writing Output: D:\MODProject\RPGSetupScreen\build\reobfJar\output.jar
   shake1227/rpgsetupscreen/network/RPGNetwork$PacketOpenEditor.class
   shake1227/rpgsetupscreen/network/RPGNetwork$PacketOpenGui.class
   shake1227/rpgsetupscreen/network/RPGNetwork$PacketRequestSync.class
+  shake1227/rpgsetupscreen/network/RPGNetwork$PacketSyncConfig.class
   shake1227/rpgsetupscreen/network/RPGNetwork$PacketSyncData.class
+  shake1227/rpgsetupscreen/network/RPGNetwork$PacketTogglePhysics.class
   shake1227/rpgsetupscreen/network/RPGNetwork.class
   shake1227/rpgsetupscreen/setup/
   shake1227/rpgsetupscreen/setup/RPGCapability$1.class
@@ -199,4 +226,5 @@ Writing Output: D:\MODProject\RPGSetupScreen\build\reobfJar\output.jar
   shake1227/rpgsetupscreen/setup/RPGCommands$SpawnData$Entry.class
   shake1227/rpgsetupscreen/setup/RPGCommands$SpawnData.class
   shake1227/rpgsetupscreen/setup/RPGCommands.class
+  shake1227/rpgsetupscreen/setup/RPGConfig.class
   shake1227/rpgsetupscreen/setup/RPGEventHandler.class

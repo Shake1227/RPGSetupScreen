@@ -10,10 +10,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public class RPGCapability {
-    // Capability トークンと取得（公開 API は元コードと同じシンボルを維持）
     public static final Capability<IRPGData> INSTANCE = CapabilityManager.get(new CapabilityToken<IRPGData>() {});
 
-    // 登録リスナをイベントバスに追加
     public static void register(IEventBus bus) {
         bus.addListener(RPGCapability::onRegisterCapabilities);
     }
@@ -22,7 +20,6 @@ public class RPGCapability {
         ev.register(IRPGData.class);
     }
 
-    // 外部から参照されるインターフェースは元と同じメソッド群を維持
     public interface IRPGData {
         boolean isFinished(); void setFinished(boolean f);
         int getGender(); void setGender(int g);
@@ -34,7 +31,10 @@ public class RPGCapability {
         float getChestSep(); void setChestSep(float s);
         float getChestAng(); void setChestAng(float a);
 
-        // 物理（保存不要）
+        // 新規追加: 物理演算のON/OFF
+        boolean isPhysicsEnabled(); void setPhysicsEnabled(boolean p);
+
+        // 物理変数
         float getBouncePosL(); void setBouncePosL(float p);
         float getPrevBouncePosL(); void setPrevBouncePosL(float p);
         float getBounceVelL(); void setBounceVelL(float v);
@@ -58,9 +58,7 @@ public class RPGCapability {
         void copyFrom(IRPGData other);
     }
 
-    // 実装：元の動作と同等だが内部は配列とヘルパーを使って少し異なる表現にしている
     public static class Imp implements IRPGData {
-        // 永続化するプロパティ
         private boolean finished = false;
         private int gender = 0;
         private float width = 1.0f;
@@ -69,15 +67,11 @@ public class RPGCapability {
         private float chestY = 0.0f;
         private float chestSep = 0.0f;
         private float chestAng = 0.0f;
+        private boolean physics = true; // デフォルトON
 
-        // 物理系をコンパクトに管理する配列（左: index 0-2, 旋回左: 3-5, 右: 6-8, 旋回右: 9-11）
-        // 各 3 要素は [pos, prevPos, vel] または [rot, prevRot, rotVel]
         private final float[] physical = new float[12];
-
-        // プレイヤー移動量計算用
         private double prevPlayerX = Double.NaN, prevPlayerY = Double.NaN, prevPlayerZ = Double.NaN;
 
-        // --- 永続化プロパティのアクセサ ---
         public boolean isFinished() { return finished; }
         public void setFinished(boolean f) { this.finished = f; }
         public int getGender() { return gender; }
@@ -96,7 +90,10 @@ public class RPGCapability {
         public float getChestAng() { return chestAng; }
         public void setChestAng(float a) { this.chestAng = a; }
 
-        // --- 物理系のゲッター/セッター（配列アクセス） ---
+        public boolean isPhysicsEnabled() { return physics; }
+        public void setPhysicsEnabled(boolean p) { this.physics = p; }
+
+        // --- Physics Getters/Setters ---
         private static final int L_POS = 0, L_PREV_POS = 1, L_VEL = 2;
         private static final int L_ROT = 3, L_PREV_ROT = 4, L_ROTVEL = 5;
         private static final int R_POS = 6, R_PREV_POS = 7, R_VEL = 8;
@@ -130,7 +127,6 @@ public class RPGCapability {
         public float getBounceRotVelR() { return physical[R_ROTVEL]; }
         public void setBounceRotVelR(float v) { physical[R_ROTVEL] = v; }
 
-        // プレイヤー位置
         public double getPrevPlayerX() { return prevPlayerX; }
         public void setPrevPlayerX(double x) { prevPlayerX = x; }
         public double getPrevPlayerY() { return prevPlayerY; }
@@ -140,7 +136,6 @@ public class RPGCapability {
 
         @Override
         public void copyFrom(IRPGData other) {
-            // 永続化部分のみコピー（物理は保存不要の意図に従う）
             this.finished = other.isFinished();
             this.gender = other.getGender();
             this.width = other.getWidth();
@@ -149,9 +144,9 @@ public class RPGCapability {
             this.chestY = other.getChestY();
             this.chestSep = other.getChestSep();
             this.chestAng = other.getChestAng();
+            this.physics = other.isPhysicsEnabled();
         }
 
-        // NBT 保存 / 読み込み（キーは元と同じ）
         public void saveNBT(CompoundTag tag) {
             tag.putBoolean("f", finished);
             tag.putInt("g", gender);
@@ -161,6 +156,7 @@ public class RPGCapability {
             tag.putFloat("cy", chestY);
             tag.putFloat("cs", chestSep);
             tag.putFloat("ca", chestAng);
+            tag.putBoolean("phy", physics);
         }
 
         public void loadNBT(CompoundTag tag) {
@@ -172,10 +168,10 @@ public class RPGCapability {
             chestY = tag.getFloat("cy");
             chestSep = tag.getFloat("cs");
             chestAng = tag.getFloat("ca");
+            physics = !tag.contains("phy") || tag.getBoolean("phy");
         }
     }
 
-    // Provider（シリアライズは CompoundTag を使う）
     public static class Provider implements ICapabilitySerializable<CompoundTag> {
         private final Imp impl = new Imp();
         private final LazyOptional<IRPGData> capOptional = LazyOptional.of(() -> impl);
