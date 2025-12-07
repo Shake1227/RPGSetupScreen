@@ -31,10 +31,8 @@ public class RPGCapability {
         float getChestSep(); void setChestSep(float s);
         float getChestAng(); void setChestAng(float a);
 
-        // 新規追加: 物理演算のON/OFF
         boolean isPhysicsEnabled(); void setPhysicsEnabled(boolean p);
 
-        // 物理変数
         float getBouncePosL(); void setBouncePosL(float p);
         float getPrevBouncePosL(); void setPrevBouncePosL(float p);
         float getBounceVelL(); void setBounceVelL(float v);
@@ -67,7 +65,7 @@ public class RPGCapability {
         private float chestY = 0.0f;
         private float chestSep = 0.0f;
         private float chestAng = 0.0f;
-        private boolean physics = true; // デフォルトON
+        private boolean physics = true;
 
         private final float[] physical = new float[12];
         private double prevPlayerX = Double.NaN, prevPlayerY = Double.NaN, prevPlayerZ = Double.NaN;
@@ -93,7 +91,6 @@ public class RPGCapability {
         public boolean isPhysicsEnabled() { return physics; }
         public void setPhysicsEnabled(boolean p) { this.physics = p; }
 
-        // --- Physics Getters/Setters ---
         private static final int L_POS = 0, L_PREV_POS = 1, L_VEL = 2;
         private static final int L_ROT = 3, L_PREV_ROT = 4, L_ROTVEL = 5;
         private static final int R_POS = 6, R_PREV_POS = 7, R_VEL = 8;

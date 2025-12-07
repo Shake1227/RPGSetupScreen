@@ -5,12 +5,17 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.storage.LevelResource;
 import net.minecraftforge.event.AttachCapabilitiesEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.network.PacketDistributor;
 import shake1227.rpgsetupscreen.RPGSetupScreen;
 import shake1227.rpgsetupscreen.network.RPGNetwork;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 
 public class RPGEventHandler {
 
@@ -26,38 +31,45 @@ public class RPGEventHandler {
     @SubscribeEvent
     public void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
-            // サーバー設定（制限）を同期
             RPGNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
                     new RPGNetwork.PacketSyncConfig(
-                            RPGConfig.ENABLE_GENDER.get(),
-                            RPGConfig.ENABLE_WIDTH.get(),
-                            RPGConfig.ENABLE_HEIGHT.get(),
-                            RPGConfig.ENABLE_CHEST_SIZE.get(),
-                            RPGConfig.ENABLE_CHEST_Y.get(),
-                            RPGConfig.ENABLE_CHEST_SEP.get(),
-                            RPGConfig.ENABLE_CHEST_ANG.get(),
-                            RPGConfig.ENABLE_PHYSICS.get()
+                            RPGConfig.ENABLE_GENDER.get(), RPGConfig.ENABLE_WIDTH.get(), RPGConfig.ENABLE_HEIGHT.get(),
+                            RPGConfig.ENABLE_CHEST_SIZE.get(), RPGConfig.ENABLE_CHEST_Y.get(), RPGConfig.ENABLE_CHEST_SEP.get(),
+                            RPGConfig.ENABLE_CHEST_ANG.get(), RPGConfig.ENABLE_PHYSICS.get()
                     ));
 
-            // プレイヤーデータを同期
+            RPGScreenManager manager = RPGScreenManager.get(player.server);
+            RPGNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new RPGNetwork.PacketSyncScreens(manager.screens));
+
+            try {
+                File serverConfigDir = player.server.getWorldPath(new LevelResource("serverconfig")).toFile();
+                File logoFile = new File(serverConfigDir, "rpgscreen_logo.png");
+
+                if (logoFile.exists() && logoFile.isFile()) {
+                    try (FileInputStream fis = new FileInputStream(logoFile)) {
+                        byte[] data = fis.readAllBytes();
+                        if (data.length > 0 && data.length < 1048576) {
+                            RPGNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new RPGNetwork.PacketSyncLogo(data));
+                        } else {
+                            System.out.println("[RPGSetupScreen] Logo file is too large or empty: " + data.length + " bytes");
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            RPGCommands.ResetData resetData = RPGCommands.ResetData.get(player.serverLevel());
+            boolean shouldReset = resetData.remove(player.getUUID());
+
             player.getCapability(RPGCapability.INSTANCE).ifPresent(cap -> {
+                if (shouldReset) cap.setFinished(false);
                 RPGNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
-                        new RPGNetwork.PacketSyncData(
-                                player.getId(),
-                                cap.isFinished(),
-                                cap.getGender(),
-                                cap.getWidth(),
-                                cap.getHeight(),
-                                cap.getChest(),
-                                cap.getChestY(),
-                                cap.getChestSep(),
-                                cap.getChestAng(),
-                                cap.isPhysicsEnabled()
-                        ));
+                        new RPGNetwork.PacketSyncData(player.getId(), cap.isFinished(), cap.getGender(), cap.getWidth(), cap.getHeight(), cap.getChest(), cap.getChestY(), cap.getChestSep(), cap.getChestAng(), cap.isPhysicsEnabled()));
 
                 if (!cap.isFinished()) {
                     player.setGameMode(GameType.SPECTATOR);
-                    RPGNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new RPGNetwork.PacketOpenGui());
+                    RPGNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new RPGNetwork.PacketForceReset());
                 }
             });
         }

@@ -1,71 +1,105 @@
 package shake1227.rpgsetupscreen.client;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import net.minecraft.client.Minecraft;
 import net.minecraftforge.fml.loading.FMLPaths;
 
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.nio.file.Path;
+import java.io.*;
 import java.util.HashMap;
 import java.util.Map;
 
 public class ClientSettingsCache {
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final Path CONFIG_DIR = FMLPaths.CONFIGDIR.get();
-    private static final File CACHE_FILE = CONFIG_DIR.resolve("rpgsetupscreen_cache.json").toFile();
+    private static final Map<String, CachedData> cache = new HashMap<>();
+    private static File file;
 
-    public static class CachedData {
-        public int gender;
-        public float width, height, chest, chestY, chestSep, chestAng;
-        public boolean physics;
+    public static boolean enableGender = true;
+    public static boolean enableWidth = true;
+    public static boolean enableHeight = true;
+    public static boolean enableChest = true;
+    public static boolean enableChestY = true;
+    public static boolean enableChestSep = true;
+    public static boolean enableChestAng = true;
+    public static boolean enablePhysics = true;
 
-        public CachedData(int g, float w, float h, float c, float cy, float cs, float ca, boolean physics) {
-            this.gender=g; this.width=w; this.height=h; this.chest=c;
-            this.chestY=cy; this.chestSep=cs; this.chestAng=ca;
-            this.physics = physics;
+    private static File getFile() {
+        if (file == null) {
+            file = FMLPaths.CONFIGDIR.get().resolve("rpgsetupscreen_client_cache.dat").toFile();
         }
+        return file;
     }
 
-    private static Map<String, CachedData> cacheMap = new HashMap<>();
+    public static void init() {
+        getFile();
+        load();
+    }
 
+    public static void update(boolean g, boolean w, boolean h, boolean c, boolean cy, boolean cs, boolean ca, boolean phys) {
+        enableGender = g; enableWidth = w; enableHeight = h; enableChest = c;
+        enableChestY = cy; enableChestSep = cs; enableChestAng = ca; enablePhysics = phys;
+    }
+
+    @SuppressWarnings("unchecked")
     public static void load() {
-        if (!CACHE_FILE.exists()) return;
-        try (FileReader reader = new FileReader(CACHE_FILE)) {
-            Map<String, CachedData> data = GSON.fromJson(reader, new com.google.gson.reflect.TypeToken<Map<String, CachedData>>(){}.getType());
-            if (data != null) cacheMap = data;
+        File f = getFile();
+        if (f.exists()) {
+            try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(f))) {
+                Map<String, CachedData> data = (Map<String, CachedData>) ois.readObject();
+                cache.clear();
+                cache.putAll(data);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public static void save(int g, float w, float h, float c, float cy, float cs, float ca, boolean phys) {
+        String ip = getCurrentServerIP();
+        cache.put(ip, new CachedData(g, w, h, c, cy, cs, ca, phys));
+        saveToFile();
+    }
+
+    private static void saveToFile() {
+        File f = getFile();
+        try {
+            if (f.getParentFile() != null && !f.getParentFile().exists()) {
+                f.getParentFile().mkdirs();
+            }
+            try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(f))) {
+                oos.writeObject(cache);
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    public static void save(int g, float w, float h, float c, float cy, float cs, float ca, boolean physics) {
-        String key = getServerKey();
-        if (key == null) return;
-
-        cacheMap.put(key, new CachedData(g, w, h, c, cy, cs, ca, physics));
-
-        try (FileWriter writer = new FileWriter(CACHE_FILE)) {
-            GSON.toJson(cacheMap, writer);
-        } catch (Exception e) {
-            e.printStackTrace();
+    public static void clear() {
+        String ip = getCurrentServerIP();
+        if (cache.containsKey(ip)) {
+            cache.remove(ip);
+            saveToFile();
         }
     }
 
     public static CachedData getForCurrentServer() {
-        String key = getServerKey();
-        return (key != null) ? cacheMap.get(key) : null;
+        return cache.get(getCurrentServerIP());
     }
 
-    private static String getServerKey() {
+    private static String getCurrentServerIP() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.getCurrentServer() != null) {
             return mc.getCurrentServer().ip;
-        } else if (mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null) {
-            return "SP_" + mc.getSingleplayerServer().getWorldData().getLevelName();
         }
-        return null;
+        return "singleplayer";
+    }
+
+    public static class CachedData implements Serializable {
+        private static final long serialVersionUID = 1L;
+        public int gender;
+        public float width, height, chest, chestY, chestSep, chestAng;
+        public boolean physics;
+
+        public CachedData(int g, float w, float h, float c, float cy, float cs, float ca, boolean phys) {
+            this.gender = g; this.width = w; this.height = h; this.chest = c;
+            this.chestY = cy; this.chestSep = cs; this.chestAng = ca; this.physics = phys;
+        }
     }
 }

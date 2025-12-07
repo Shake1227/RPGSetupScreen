@@ -2,6 +2,8 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/952750281/rpgsetupscreen.ModernNotification.main.iml" filepath="$PROJECT_DIR$/.idea/modules/952750281/rpgsetupscreen.ModernNotification.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/952750281/rpgsetupscreen.ModernNotification.test.iml" filepath="$PROJECT_DIR$/.idea/modules/952750281/rpgsetupscreen.ModernNotification.test.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/rpgsetupscreen.main.iml" filepath="$PROJECT_DIR$/.idea/modules/rpgsetupscreen.main.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/rpgsetupscreen.test.iml" filepath="$PROJECT_DIR$/.idea/modules/rpgsetupscreen.test.iml" />
     </modules>

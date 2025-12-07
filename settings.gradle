@@ -13,3 +13,5 @@ plugins {
 }
 
 rootProject.name = 'rpgsetupscreen'
+include ':ModernNotification'
+project(':ModernNotification').projectDir = new File('../ModernNotification')

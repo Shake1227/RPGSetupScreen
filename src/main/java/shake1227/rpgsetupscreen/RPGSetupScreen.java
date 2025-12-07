@@ -1,12 +1,15 @@
 package shake1227.rpgsetupscreen;
 
+import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import shake1227.rpgsetupscreen.client.KeyInit;
+import shake1227.rpgsetupscreen.item.ItemInit;
 import shake1227.rpgsetupscreen.network.RPGNetwork;
 import shake1227.rpgsetupscreen.setup.RPGCapability;
 import shake1227.rpgsetupscreen.setup.RPGCommands;
@@ -20,12 +23,13 @@ public class RPGSetupScreen {
     public RPGSetupScreen() {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
 
-        // コンフィグ登録
         ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, RPGConfig.SPEC);
 
         RPGCapability.register(modEventBus);
-        modEventBus.addListener(KeyInit::register);
 
+        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> modEventBus.addListener(KeyInit::register));
+
+        ItemInit.register(modEventBus);
         RPGNetwork.register();
 
         MinecraftForge.EVENT_BUS.register(new RPGEventHandler());
