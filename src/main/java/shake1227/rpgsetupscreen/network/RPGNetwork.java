@@ -54,6 +54,20 @@ public class RPGNetwork {
         CHANNEL.registerMessage(id++, PacketOpenManager.class, (a,b)->{}, buf->new PacketOpenManager(), PacketOpenManager::handle);
         CHANNEL.registerMessage(id++, PacketShowNotification.class, PacketShowNotification::enc, PacketShowNotification::dec, PacketShowNotification::handle);
         CHANNEL.registerMessage(id++, PacketSyncLogo.class, PacketSyncLogo::enc, PacketSyncLogo::dec, PacketSyncLogo::handle);
+        CHANNEL.registerMessage(id++, PacketRequestScreens.class, (a,b)->{}, buf->new PacketRequestScreens(), PacketRequestScreens::handle);
+    }
+
+    public static class PacketRequestScreens {
+        public static void handle(PacketRequestScreens m, Supplier<NetworkEvent.Context> ctx) {
+            ctx.get().enqueueWork(() -> {
+                ServerPlayer p = ctx.get().getSender();
+                if (p != null) {
+                    RPGScreenManager manager = RPGScreenManager.get(p.server);
+                    RPGNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> p), new PacketSyncScreens(manager.screens));
+                }
+            });
+            ctx.get().setPacketHandled(true);
+        }
     }
 
     public static class PacketFinishSetup {
@@ -87,6 +101,8 @@ public class RPGNetwork {
                 ServerPlayer p = ctx.get().getSender();
                 if(p == null) return;
 
+                System.out.println("[RPGSetupScreen] Received PacketFinishSetup (Repair/Update) from " + p.getName().getString());
+
                 if (m.consumeItem) {
                     int slot = -1;
                     for(int i=0; i<p.getInventory().getContainerSize(); i++) { if (p.getInventory().getItem(i).getItem() == ItemInit.FLOPPY_DISK.get()) { slot = i; break; } }
@@ -100,7 +116,9 @@ public class RPGNetwork {
                 fp.getCapability(RPGCapability.INSTANCE).ifPresent(cap -> {
                     boolean wasFinished = cap.isFinished();
                     cap.setGender(m.g); cap.setWidth(m.w); cap.setHeight(m.h); cap.setChest(m.c); cap.setChestY(m.cy); cap.setChestSep(m.cs); cap.setChestAng(m.ca); cap.setPhysicsEnabled(m.physics); cap.setFinished(true);
+
                     RPGNetwork.CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(()->fp), new PacketSyncData(fp.getId(), true, m.g, m.w, m.h, m.c, m.cy, m.cs, m.ca, m.physics));
+
                     if (!wasFinished && fp.gameMode.getGameModeForPlayer() == GameType.SPECTATOR) { fp.setGameMode(GameType.SURVIVAL); }
                 });
 

@@ -65,13 +65,19 @@ public class ScreenManager extends Screen {
                     } else {
                         screens.add(new ScreenData.Def("New Screen", false));
                     }
-                    saveAndReload();
+                    this.rebuildWidgets();
                 }).bounds(x, y, slotW, slotH).build());
             }
         }
 
         this.addRenderableWidget(Button.builder(Component.translatable("gui.rpgsetupscreen.manager.close"), b -> this.onClose())
                 .bounds(centerX - 40, vHeight - 30, 80, 20).build());
+    }
+
+    @Override
+    public void removed() {
+        RPGNetwork.CHANNEL.sendToServer(new RPGNetwork.PacketSaveScreens(screens));
+        super.removed();
     }
 
     private void saveAndReload() {

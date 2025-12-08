@@ -28,7 +28,7 @@
   "message.rpgsetupscreen.floppy_used": "Settings saved.",
   "command.rpgsetupscreen.reset_success": "Reset data for %s. They will see the setup screen on next login.",
   "command.rpgsetupscreen.reset_fail": "Could not find player data for %s.",
-  "item.rpgsetupscreen.floppy_disk": "Character Setup Disk",
+  "item.rpgsetupscreen.floppy_disk": "Floppy Disk",
 
   "gui.rpgsetupscreen.manager.title": "Screen Manager",
   "gui.rpgsetupscreen.manager.add": "+ New Screen",

@@ -5,6 +5,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.LoadingOverlay;
 import net.minecraft.client.player.RemotePlayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -44,6 +45,10 @@ public class IntroAnimation {
 
     private static final Random random = new Random();
 
+    private static long pauseStart = 0;
+    private static long totalPausedTime = 0;
+    private static boolean wasPaused = false;
+
     public static void start() { start(true, null); }
     public static void start(boolean skippable) { start(skippable, null); }
 
@@ -56,6 +61,8 @@ public class IntroAnimation {
         canSkip = skippable;
         targetPos = target;
         startTime = System.currentTimeMillis();
+        totalPausedTime = 0;
+        wasPaused = false;
 
         originalSensitivity = mc.options.sensitivity().get();
         originalCameraType = mc.options.getCameraType();
@@ -94,6 +101,11 @@ public class IntroAnimation {
         return active;
     }
 
+    public static boolean isPaused() {
+        Minecraft mc = Minecraft.getInstance();
+        return mc.getOverlay() instanceof LoadingOverlay;
+    }
+
     public static void skip() {
         if (!active || !canSkip) return;
         stop();
@@ -101,7 +113,7 @@ public class IntroAnimation {
 
     public static boolean shouldHideHead() {
         if (!active) return false;
-        long elapsed = System.currentTimeMillis() - startTime;
+        long elapsed = System.currentTimeMillis() - startTime - totalPausedTime;
         float progress = (float)elapsed / (float)DURATION_CAMERA;
         return progress > 0.8f;
     }
@@ -134,7 +146,28 @@ public class IntroAnimation {
             return;
         }
 
-        long elapsed = System.currentTimeMillis() - startTime;
+        if (mc.getCameraEntity() != cameraDummy) {
+            mc.setCameraEntity(cameraDummy);
+        }
+
+        if (isPaused()) {
+            if (!wasPaused) {
+                pauseStart = System.currentTimeMillis();
+                wasPaused = true;
+            }
+            mc.options.sensitivity().set(0.0);
+            mc.options.setCameraType(CameraType.FIRST_PERSON);
+            long pausedElapsed = pauseStart - startTime - totalPausedTime;
+            updateDummyPosition(Math.max(0, pausedElapsed));
+            return;
+        } else {
+            if (wasPaused) {
+                totalPausedTime += (System.currentTimeMillis() - pauseStart);
+                wasPaused = false;
+            }
+        }
+
+        long elapsed = System.currentTimeMillis() - startTime - totalPausedTime;
         if (elapsed > DURATION_TOTAL) {
             stop();
             return;
@@ -181,7 +214,14 @@ public class IntroAnimation {
     public static void render(GuiGraphics g, int width, int height) {
         if (!active) return;
 
-        long elapsed = System.currentTimeMillis() - startTime;
+        long current = System.currentTimeMillis();
+        long elapsed;
+        if (wasPaused) {
+            elapsed = pauseStart - startTime - totalPausedTime;
+        } else {
+            elapsed = current - startTime - totalPausedTime;
+        }
+        elapsed = Math.max(0, elapsed);
 
         g.pose().pushPose();
         g.pose().translate(0, 0, 50);

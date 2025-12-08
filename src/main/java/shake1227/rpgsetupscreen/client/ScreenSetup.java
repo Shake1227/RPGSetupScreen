@@ -4,6 +4,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.LoadingOverlay;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.player.RemotePlayer;
 import net.minecraft.network.chat.Component;
@@ -245,6 +246,8 @@ public class ScreenSetup extends Screen {
 
     @Override
     public boolean mouseClicked(double mx, double my, int btn) {
+        if (this.minecraft != null && this.minecraft.getOverlay() != null) return false;
+
         if (this.minecraft.options.keyInventory.matches(btn, 0)) return true;
         float scale = getForcedScale();
         return super.mouseClicked(mx / scale, my / scale, btn);
@@ -252,18 +255,24 @@ public class ScreenSetup extends Screen {
 
     @Override
     public boolean mouseReleased(double mx, double my, int btn) {
+        if (this.minecraft != null && this.minecraft.getOverlay() != null) return false;
+
         float scale = getForcedScale();
         return super.mouseReleased(mx / scale, my / scale, btn);
     }
 
     @Override
     public boolean mouseDragged(double mx, double my, int btn, double dx, double dy) {
+        if (this.minecraft != null && this.minecraft.getOverlay() != null) return false;
+
         float scale = getForcedScale();
         return super.mouseDragged(mx / scale, my / scale, btn, dx / scale, dy / scale);
     }
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (this.minecraft != null && this.minecraft.getOverlay() != null) return false;
+
         if (this.minecraft.options.keyInventory.matches(keyCode, scanCode)) return true;
         if (keyCode == 256 && !this.shouldCloseOnEsc()) return true;
         return super.keyPressed(keyCode, scanCode, modifiers);
@@ -271,6 +280,12 @@ public class ScreenSetup extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
+        if (this.minecraft != null && this.minecraft.getOverlay() != null) {
+            this.openTime = System.currentTimeMillis();
+            this.renderBackground(g);
+            return;
+        }
+
         if (fromFloppy) {
             this.renderBackground(g);
         } else if (targetUUID.isEmpty()) {

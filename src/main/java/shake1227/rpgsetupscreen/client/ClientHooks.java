@@ -1,12 +1,15 @@
 package shake1227.rpgsetupscreen.client;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.model.PlayerModel;
 import net.minecraft.client.renderer.entity.player.PlayerRenderer;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
@@ -33,22 +36,39 @@ public class ClientHooks {
 
     private static ClientSettingsCache.CachedData pendingData = null;
     private static boolean introPlayedSession = false;
+    private static boolean pendingSetupOpen = false;
 
-    public static List<ScreenData.Def> screenDefs = new ArrayList<>();
+    public static final List<ScreenData.Def> screenDefs = new ArrayList<>();
     public static CompoundTag accumulatedInputs = new CompoundTag();
     public static String pendingSpawnLocationName = "";
     public static Vec3 pendingSpawnPosition = null;
+
+    private static boolean pendingManagerOpen = false;
+
+    private static int tickCounter = 0;
+    private static boolean lastHasArmor = false;
 
     public static void setPendingSetupData(int g, float w, float h, float c, float cy, float cs, float ca, boolean phys) {
         pendingData = new ClientSettingsCache.CachedData(g, w, h, c, cy, cs, ca, phys);
     }
 
     public static void updateScreenDefs(List<ScreenData.Def> screens) {
-        screenDefs = screens;
+        screenDefs.clear();
+        screenDefs.addAll(screens);
+
+        if (pendingManagerOpen) {
+            pendingManagerOpen = false;
+            Minecraft.getInstance().setScreen(new ScreenManager(screenDefs));
+        }
+    }
+
+    public static void requestOpenManager() {
+        pendingManagerOpen = true;
+        RPGNetwork.CHANNEL.sendToServer(new RPGNetwork.PacketRequestScreens());
     }
 
     public static void openManager() {
-        Minecraft.getInstance().setScreen(new ScreenManager(screenDefs));
+        requestOpenManager();
     }
 
     public static void openScreen(int index) {
@@ -90,6 +110,7 @@ public class ClientHooks {
             ));
         }
         Minecraft.getInstance().setScreen(null);
+        pendingSetupOpen = false;
 
         String locName = pendingSpawnLocationName != null && !pendingSpawnLocationName.isEmpty() ? pendingSpawnLocationName : "???";
         IntroAnimation.setOnComplete(() -> {
@@ -118,6 +139,12 @@ public class ClientHooks {
         introPlayedSession = false;
         ClientSettingsCache.load();
         accumulatedInputs = new CompoundTag();
+        pendingManagerOpen = false;
+        pendingSetupOpen = false;
+
+        if (Minecraft.getInstance().player != null) {
+            lastHasArmor = !Minecraft.getInstance().player.getItemBySlot(EquipmentSlot.CHEST).isEmpty();
+        }
     }
 
     @SubscribeEvent
@@ -128,6 +155,8 @@ public class ClientHooks {
         pendingData = null;
         pendingSpawnLocationName = "";
         pendingSpawnPosition = null;
+        pendingManagerOpen = false;
+        pendingSetupOpen = false;
     }
 
     public static void handleSync(int entityId, boolean finished, int gender, float width, float height, float chest, float chestY, float chestSep, float chestAng, boolean physics) {
@@ -139,11 +168,10 @@ public class ClientHooks {
                 cap.setFinished(finished); cap.setGender(gender); cap.setWidth(width); cap.setHeight(height); cap.setChest(chest); cap.setChestY(chestY); cap.setChestSep(chestSep); cap.setChestAng(chestAng); cap.setPhysicsEnabled(physics);
                 if (player == mc.player) {
                     if (finished) {
+                        pendingSetupOpen = false;
                         if (!introPlayedSession) playIntro(true, null);
                     } else {
-                        if (!(mc.screen instanceof ScreenSetup) && !(mc.screen instanceof ScreenSpawn) && !(mc.screen instanceof ScreenCustom) && !(mc.screen instanceof ScreenManager) && !(mc.screen instanceof ScreenEditor)) {
-                            openScreen(0);
-                        }
+                        pendingSetupOpen = true;
                     }
                 }
             });
@@ -156,7 +184,7 @@ public class ClientHooks {
         accumulatedInputs = new CompoundTag();
         pendingSpawnLocationName = "";
         pendingSpawnPosition = null;
-        openScreen(0);
+        pendingSetupOpen = true;
     }
 
     public static void playIntro(boolean skippable, Vec3 targetPos) {
@@ -210,16 +238,24 @@ public class ClientHooks {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) return;
 
-        if (IntroAnimation.isActive()) {
+        tickCounter++;
+        if (tickCounter >= 20) {
+            tickCounter = 0;
+            checkSkinAndArmor();
+        }
+
+        if (pendingSetupOpen && mc.getOverlay() == null && mc.screen == null) {
+            openScreen(0);
+        }
+
+        if (IntroAnimation.isActive() && !IntroAnimation.isPaused()) {
             mc.options.hideGui = false;
-            while (mc.options.keyTogglePerspective.consumeClick()) { }
-            while (mc.options.keyUp.consumeClick()) { }
-            while (mc.options.keyDown.consumeClick()) { }
-            while (mc.options.keyLeft.consumeClick()) { }
-            while (mc.options.keyRight.consumeClick()) { }
-            while (mc.options.keyJump.consumeClick()) { }
-            while (mc.options.keySprint.consumeClick()) { }
-            while (mc.options.keyShift.consumeClick()) { }
+            for (KeyMapping key : mc.options.keyMappings) {
+                if (key == mc.options.keyChat || key == mc.options.keyCommand || key == mc.options.keyScreenshot || key == mc.options.keyFullscreen) {
+                    continue;
+                }
+                while (key.consumeClick()) { }
+            }
         }
 
         if (KeyInit.TOGGLE_PHYSICS.consumeClick()) {
@@ -247,6 +283,53 @@ public class ClientHooks {
         }
     }
 
+    private static void checkSkinAndArmor() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) return;
+
+        boolean needSync = false;
+
+        var dispatcher = mc.getEntityRenderDispatcher();
+        for (String skinType : new String[]{"default", "slim"}) {
+            var renderer = dispatcher.getSkinMap().get(skinType);
+            if (renderer instanceof PlayerRenderer pr) {
+                boolean hasLayer = false;
+                try {
+                    java.lang.reflect.Field layersField = net.minecraft.client.renderer.entity.LivingEntityRenderer.class.getDeclaredField("layers");
+                    layersField.setAccessible(true);
+                    java.util.List<?> layers = (java.util.List<?>) layersField.get(pr);
+                    hasLayer = layers.stream().anyMatch(l -> l instanceof PlayerChestLayer);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
+                if (!hasLayer) {
+                    pr.addLayer(new PlayerChestLayer(pr));
+                    needSync = true;
+                }
+            }
+        }
+
+        boolean hasArmor = !mc.player.getItemBySlot(EquipmentSlot.CHEST).isEmpty();
+        if (hasArmor != lastHasArmor) {
+            lastHasArmor = hasArmor;
+            needSync = true;
+        }
+
+        if (needSync) {
+            mc.player.getCapability(RPGCapability.INSTANCE).ifPresent(cap -> {
+                RPGNetwork.CHANNEL.sendToServer(new RPGNetwork.PacketFinishSetup(
+                        "",
+                        cap.getGender(), cap.getWidth(), cap.getHeight(), cap.getChest(),
+                        cap.getChestY(), cap.getChestSep(), cap.getChestAng(), cap.isPhysicsEnabled(),
+                        "",
+                        new CompoundTag(),
+                        false
+                ));
+            });
+        }
+    }
+
     @SubscribeEvent
     public static void onRenderGuiOverlay(RenderGuiOverlayEvent.Pre event) {
         if (IntroAnimation.isActive()) {
@@ -259,7 +342,7 @@ public class ClientHooks {
 
     @SubscribeEvent
     public static void onMouseInput(InputEvent.MouseButton.Pre event) {
-        if (IntroAnimation.isActive()) {
+        if (IntroAnimation.isActive() && !IntroAnimation.isPaused() && Minecraft.getInstance().screen == null) {
             event.setCanceled(true);
         }
     }
@@ -267,15 +350,41 @@ public class ClientHooks {
     @SubscribeEvent
     public static void onKeyInput(InputEvent.Key event) {
         if (IntroAnimation.isActive()) {
-            if (event.getKey() == InputConstants.KEY_ESCAPE && event.getAction() == InputConstants.PRESS) {
-                IntroAnimation.skip();
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.screen != null) return;
+
+            int k = event.getKey();
+            if (k == mc.options.keyChat.getKey().getValue() ||
+                    k == mc.options.keyCommand.getKey().getValue()) {
+                return;
+            }
+
+            if (k == InputConstants.KEY_ESCAPE) {
+                if (event.getAction() == InputConstants.PRESS) {
+                    IntroAnimation.skip();
+                }
+                event.setCanceled(true);
+                return;
+            }
+
+            if (!IntroAnimation.isPaused()) {
+                event.setCanceled(true);
+            }
+        }
+    }
+
+    @SubscribeEvent
+    public static void onScreenOpening(ScreenEvent.Opening event) {
+        if (IntroAnimation.isActive() && !IntroAnimation.isPaused()) {
+            if (event.getNewScreen() instanceof PauseScreen) {
+                event.setCanceled(true);
             }
         }
     }
 
     @SubscribeEvent
     public static void onRenderHand(RenderHandEvent event) {
-        if (IntroAnimation.isActive()) {
+        if (IntroAnimation.isActive() && !IntroAnimation.isPaused()) {
             event.setCanceled(true);
         }
     }

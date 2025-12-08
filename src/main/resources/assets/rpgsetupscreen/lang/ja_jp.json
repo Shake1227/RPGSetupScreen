@@ -28,7 +28,7 @@
   "message.rpgsetupscreen.floppy_used": "設定を保存しました。",
   "command.rpgsetupscreen.reset_success": "%s のデータをリセットしました。次回ログイン時に設定画面が表示されます。",
   "command.rpgsetupscreen.reset_fail": "%s のデータが見つかりませんでした。",
-  "item.rpgsetupscreen.floppy_disk": "キャラクター設定ディスク",
+  "item.rpgsetupscreen.floppy_disk": "フロッピーディスク",
 
   "gui.rpgsetupscreen.manager.title": "画面管理",
   "gui.rpgsetupscreen.manager.add": "+ 新規画面",
@@ -49,7 +49,7 @@
   "gui.rpgsetupscreen.editor.prop.var": "変数名:",
   "gui.rpgsetupscreen.editor.prop.color": "色:",
   "gui.rpgsetupscreen.editor.help": "長押し: 移動 | ダブルクリック: 編集 | 枠ドラッグ: リサイズ",
-  "gui.rpgsetupscreen.colorpicker.title": "カラーパレット",
+  "gui.rpgsetupscreen.colorpicker.title": "色選択",
   "gui.rpgsetupscreen.colorpicker.done": "完了",
   "gui.rpgsetupscreen.colorpicker.cancel": "キャンセル",
   "gui.rpgsetupscreen.colorpicker.hex": "Hexコード",

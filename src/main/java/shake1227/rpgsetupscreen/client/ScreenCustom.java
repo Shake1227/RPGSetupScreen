@@ -46,6 +46,8 @@ public class ScreenCustom extends Screen {
         for (ScreenData.Element e : def.elements) {
             if (e.type.equals("input")) {
                 EditBox box = new EditBox(this.font, e.x, e.y, e.w, e.h, Component.literal(""));
+                box.setMaxLength(65535);
+
                 if (e.content != null && !e.content.isEmpty()) {
                     box.setHint(Component.literal(e.content));
                 }

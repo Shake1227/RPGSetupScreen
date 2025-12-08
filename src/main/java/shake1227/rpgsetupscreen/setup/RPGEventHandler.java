@@ -40,7 +40,6 @@ public class RPGEventHandler {
 
             RPGScreenManager manager = RPGScreenManager.get(player.server);
             RPGNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new RPGNetwork.PacketSyncScreens(manager.screens));
-
             try {
                 File serverConfigDir = player.server.getWorldPath(new LevelResource("serverconfig")).toFile();
                 File logoFile = new File(serverConfigDir, "rpgscreen_logo.png");
@@ -48,12 +47,15 @@ public class RPGEventHandler {
                 if (logoFile.exists() && logoFile.isFile()) {
                     try (FileInputStream fis = new FileInputStream(logoFile)) {
                         byte[] data = fis.readAllBytes();
-                        if (data.length > 0 && data.length < 1048576) {
+                        if (data.length > 0 && data.length < 10485760) {
                             RPGNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new RPGNetwork.PacketSyncLogo(data));
                         } else {
-                            System.out.println("[RPGSetupScreen] Logo file is too large or empty: " + data.length + " bytes");
+                            System.out.println("[RPGSetupScreen] Logo file is too large (>10MB) or empty: " + data.length + " bytes");
+                            RPGNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new RPGNetwork.PacketSyncLogo(new byte[0]));
                         }
                     }
+                } else {
+                    RPGNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new RPGNetwork.PacketSyncLogo(new byte[0]));
                 }
             } catch (Exception e) {
                 e.printStackTrace();
@@ -71,6 +73,16 @@ public class RPGEventHandler {
                     player.setGameMode(GameType.SPECTATOR);
                     RPGNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new RPGNetwork.PacketForceReset());
                 }
+            });
+        }
+    }
+
+    @SubscribeEvent
+    public void onStartTracking(PlayerEvent.StartTracking event) {
+        if (event.getTarget() instanceof ServerPlayer target && event.getEntity() instanceof ServerPlayer tracker) {
+            target.getCapability(RPGCapability.INSTANCE).ifPresent(cap -> {
+                RPGNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> tracker),
+                        new RPGNetwork.PacketSyncData(target.getId(), cap.isFinished(), cap.getGender(), cap.getWidth(), cap.getHeight(), cap.getChest(), cap.getChestY(), cap.getChestSep(), cap.getChestAng(), cap.isPhysicsEnabled()));
             });
         }
     }

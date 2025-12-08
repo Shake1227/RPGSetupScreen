@@ -66,7 +66,8 @@ public class ScreenEditor extends Screen {
 
         this.addRenderableWidget(Button.builder(Component.translatable("gui.rpgsetupscreen.editor.back"), b -> {
             save();
-            this.minecraft.setScreen(new ScreenManager(allScreens));
+            ClientHooks.requestOpenManager();
+            this.minecraft.setScreen(null);
         }).bounds(5, 5, 50, 20).build());
 
         titleBox = new EditBox(this.font, 60, 5, 120, 20, Component.literal(""));
@@ -140,6 +141,7 @@ public class ScreenEditor extends Screen {
         sidebarWidgets.add(new AbstractWidgetWrapper(delBtn));
 
         overlayEditBox = new EditBox(this.font, 0, 0, 0, 0, Component.literal("Overlay"));
+        overlayEditBox.setMaxLength(65535);
         overlayEditBox.setVisible(false);
         this.addRenderableWidget(overlayEditBox);
 
@@ -150,7 +152,28 @@ public class ScreenEditor extends Screen {
     private void updateSidebarValues() { if (selectedElement == null) return; propX.setValue(String.valueOf(selectedElement.x)); propY.setValue(String.valueOf(selectedElement.y)); if (selectedElement.type.equals("input")) { propW.setValue(String.valueOf(selectedElement.w)); propH.setValue(String.valueOf(selectedElement.h)); propVar.setValue(selectedElement.varName); propRequiredBtn.setMessage(Component.literal("Required: " + (selectedElement.required ? "ON" : "OFF"))); } else if (selectedElement.type.equals("text")) { propColorBtn.setMessage(Component.literal(String.format("#%06X", selectedElement.color))); } }
     private EditBox createSidebarEditBox(String defVal, int x, int y) { EditBox box = new EditBox(this.font, x, y, 110, 20, Component.literal("")); box.setValue(defVal); this.addRenderableWidget(box); sidebarWidgets.add(new AbstractWidgetWrapper(box)); return box; }
     private void addElement(String type, int w, int h) { ScreenData.Element e = new ScreenData.Element(type); e.x = w / 2 - 50; e.y = h / 2 - 10; if (type.equals("text")) { e.content = "Text"; e.color = 0xFFFFFF; e.scale = 1.0f; } else { e.content = ""; e.w = 100; e.h = 20; e.required = false; } targetScreen.elements.add(e); selectedElement = e; updateSidebarValues(); updateOverlayBox(); this.setFocused(overlayEditBox); overlayEditBox.setFocused(true); }
-    private void save() { RPGNetwork.CHANNEL.sendToServer(new RPGNetwork.PacketSaveScreens(allScreens)); }
+
+    @Override
+    public void removed() {
+        save();
+        super.removed();
+    }
+
+    private void save() {
+        boolean found = false;
+        for (int i = 0; i < allScreens.size(); i++) {
+            if (allScreens.get(i).uuid.equals(targetScreen.uuid)) {
+                allScreens.set(i, targetScreen);
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            allScreens.add(targetScreen);
+        }
+        RPGNetwork.CHANNEL.sendToServer(new RPGNetwork.PacketSaveScreens(allScreens));
+    }
+
     private void tryParseInt(String s, java.util.function.IntConsumer setter) { try { setter.accept(Integer.parseInt(s)); } catch (NumberFormatException ignored) {} }
     private void updateOverlayBox() { if (selectedElement == null) { overlayEditBox.setVisible(false); overlayEditBox.setResponder(s -> {}); return; } if (!overlayEditBox.isVisible()) { overlayEditBox.setValue(selectedElement.content); } overlayEditBox.setResponder(s -> { if (selectedElement != null) selectedElement.content = s; }); if (selectedElement.type.equals("text")) { int w = Math.max(50, getElementWidth(selectedElement) + 10); int h = getElementHeight(selectedElement); overlayEditBox.setX(selectedElement.x - 4); overlayEditBox.setY(selectedElement.y - 4); overlayEditBox.setWidth(w + 8); overlayEditBox.setHeight(h + 8); } else { overlayEditBox.setX(selectedElement.x); overlayEditBox.setY(selectedElement.y); overlayEditBox.setWidth(selectedElement.w); overlayEditBox.setHeight(selectedElement.h); } }
     private int getElementWidth(ScreenData.Element e) { if (e.type.equals("text")) return (int)(this.font.width(e.content) * e.scale); return e.w; }
