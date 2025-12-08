@@ -16,9 +16,9 @@ import shake1227.modernnotification.notification.Notification;
 import shake1227.modernnotification.notification.NotificationManager;
 import shake1227.modernnotification.util.TextFormattingUtils;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.ArrayList;
 
 public class ModernNotificationHandler {
     public static final boolean IS_LOADED = ModList.get().isLoaded("modernnotification");
@@ -35,13 +35,20 @@ public class ModernNotificationHandler {
             else if ("warning".equalsIgnoreCase(category)) cat = NotificationCategory.WARNING;
             else if ("failure".equalsIgnoreCase(category)) cat = NotificationCategory.FAILURE;
 
-            Component messageComp = Component.translatable(translationKey, args.toArray());
+            String messageToSend;
+            if (args != null && !args.isEmpty()) {
+                messageToSend = Component.translatable(translationKey, args.toArray()).getString();
+            } else {
+                messageToSend = translationKey;
+            }
+
+            List<Component> messageComponents = TextFormattingUtils.parseLegacyText(messageToSend);
 
             S2CNotificationPacket packet = new S2CNotificationPacket(
                     NotificationType.LEFT,
                     cat,
                     null,
-                    Collections.singletonList(messageComp),
+                    messageComponents,
                     0
             );
 
@@ -55,7 +62,9 @@ public class ModernNotificationHandler {
 
     public static void showClientNotification(String translationKey, String category) {
         if (!IS_LOADED) {
-            Minecraft.getInstance().player.displayClientMessage(Component.translatable(translationKey), true);
+            if (Minecraft.getInstance().player != null) {
+                Minecraft.getInstance().player.displayClientMessage(Component.translatable(translationKey), true);
+            }
             return;
         }
 
@@ -73,9 +82,10 @@ public class ModernNotificationHandler {
                     cat,
                     null,
                     TextFormattingUtils.parseLegacyText(formatted),
-                    0
+                    -1
             );
 
+            NotificationManager.getInstance().getRenderer().calculateDynamicWidth(notification);
             NotificationManager.getInstance().addNotification(notification);
 
         } catch (Exception e) {
@@ -100,19 +110,24 @@ public class ModernNotificationHandler {
             else if ("failure".equalsIgnoreCase(category)) cat = NotificationCategory.FAILURE;
 
             Component titleComp = Component.translatable(titleKey).withStyle(ChatFormatting.WHITE, ChatFormatting.BOLD);
+
             Object[] fmtArgs = args.stream().map(s -> Component.literal(s).withStyle(ChatFormatting.GOLD)).toArray();
             Component messageComp = Component.translatable(messageKey, fmtArgs).withStyle(ChatFormatting.YELLOW);
+
+            List<Component> titleList = Collections.singletonList(titleComp);
+            List<Component> messageList = Collections.singletonList(messageComp);
 
             Notification notification = new Notification(
                     NotificationType.TOP_RIGHT,
                     cat,
-                    Collections.singletonList(titleComp),
-                    Collections.singletonList(messageComp),
+                    titleList,
+                    messageList,
                     duration
             );
 
             LogManager.getInstance().addLog(new NotificationData(notification));
 
+            NotificationManager.getInstance().getRenderer().calculateDynamicWidth(notification);
             NotificationManager.getInstance().addNotification(notification);
 
         } catch (Exception e) {

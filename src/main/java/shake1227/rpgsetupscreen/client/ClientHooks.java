@@ -5,7 +5,9 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.model.PlayerModel;
+import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.entity.player.PlayerRenderer;
+import net.minecraft.commands.Commands;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
@@ -26,6 +28,7 @@ import shake1227.rpgsetupscreen.setup.RPGCapability;
 import shake1227.rpgsetupscreen.setup.RPGCommands;
 import shake1227.rpgsetupscreen.util.ModernNotificationHandler;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -46,7 +49,7 @@ public class ClientHooks {
     private static boolean pendingManagerOpen = false;
 
     private static int tickCounter = 0;
-    private static boolean lastHasArmor = false;
+    private static boolean layerCheckFailed = false;
 
     public static void setPendingSetupData(int g, float w, float h, float c, float cy, float cs, float ca, boolean phys) {
         pendingData = new ClientSettingsCache.CachedData(g, w, h, c, cy, cs, ca, phys);
@@ -141,10 +144,7 @@ public class ClientHooks {
         accumulatedInputs = new CompoundTag();
         pendingManagerOpen = false;
         pendingSetupOpen = false;
-
-        if (Minecraft.getInstance().player != null) {
-            lastHasArmor = !Minecraft.getInstance().player.getItemBySlot(EquipmentSlot.CHEST).isEmpty();
-        }
+        layerCheckFailed = false;
     }
 
     @SubscribeEvent
@@ -157,6 +157,49 @@ public class ClientHooks {
         pendingSpawnPosition = null;
         pendingManagerOpen = false;
         pendingSetupOpen = false;
+        layerCheckFailed = false;
+    }
+
+    @SubscribeEvent
+    public static void onRegisterClientCommands(RegisterClientCommandsEvent event) {
+        event.getDispatcher().register(
+                Commands.literal("reloadmydata")
+                        .executes(ctx -> {
+                            try {
+                                Minecraft mc = Minecraft.getInstance();
+                                if (mc.player != null) {
+                                    mc.player.getCapability(RPGCapability.INSTANCE).ifPresent(cap -> {
+                                        RPGNetwork.CHANNEL.sendToServer(new RPGNetwork.PacketFinishSetup(
+                                                "",
+                                                cap.getGender(), cap.getWidth(), cap.getHeight(), cap.getChest(),
+                                                cap.getChestY(), cap.getChestSep(), cap.getChestAng(), cap.isPhysicsEnabled(),
+                                                mc.player.getStringUUID(),
+                                                new CompoundTag(),
+                                                false
+                                        ));
+                                    });
+
+                                    String key = "command.rpgsetupscreen.reload_success";
+                                    if (ModernNotificationHandler.IS_LOADED) {
+                                        ModernNotificationHandler.showClientNotification(key, "success");
+                                    } else {
+                                        mc.player.sendSystemMessage(Component.translatable(key));
+                                    }
+                                }
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                                String key = "command.rpgsetupscreen.reload_fail";
+                                if (ModernNotificationHandler.IS_LOADED) {
+                                    ModernNotificationHandler.showClientNotification(key, "failure");
+                                } else {
+                                    if (Minecraft.getInstance().player != null) {
+                                        Minecraft.getInstance().player.sendSystemMessage(Component.translatable(key));
+                                    }
+                                }
+                            }
+                            return 1;
+                        })
+        );
     }
 
     public static void handleSync(int entityId, boolean finished, int gender, float width, float height, float chest, float chestY, float chestSep, float chestAng, boolean physics) {
@@ -287,47 +330,33 @@ public class ClientHooks {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
 
-        boolean needSync = false;
+        mc.player.getCapability(RPGCapability.INSTANCE).ifPresent(cap -> {
+            if (cap.getGender() != 1 || cap.getChest() <= 0.0f) return;
 
-        var dispatcher = mc.getEntityRenderDispatcher();
-        for (String skinType : new String[]{"default", "slim"}) {
-            var renderer = dispatcher.getSkinMap().get(skinType);
-            if (renderer instanceof PlayerRenderer pr) {
-                boolean hasLayer = false;
-                try {
-                    java.lang.reflect.Field layersField = net.minecraft.client.renderer.entity.LivingEntityRenderer.class.getDeclaredField("layers");
-                    layersField.setAccessible(true);
-                    java.util.List<?> layers = (java.util.List<?>) layersField.get(pr);
-                    hasLayer = layers.stream().anyMatch(l -> l instanceof PlayerChestLayer);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
+            if (!layerCheckFailed) {
+                var dispatcher = mc.getEntityRenderDispatcher();
+                for (String skinType : new String[]{"default", "slim"}) {
+                    var renderer = dispatcher.getSkinMap().get(skinType);
+                    if (renderer instanceof PlayerRenderer pr) {
+                        boolean hasLayer = false;
+                        try {
+                            Field layersField = net.minecraft.client.renderer.entity.LivingEntityRenderer.class.getDeclaredField("layers");
+                            layersField.setAccessible(true);
+                            List<?> layers = (List<?>) layersField.get(pr);
+                            hasLayer = layers.stream().anyMatch(l -> l instanceof PlayerChestLayer);
+                        } catch (Exception e) {
+                            System.out.println("[RPGSetupScreen] Failed to access renderer layers: " + e.getMessage());
+                            layerCheckFailed = true;
+                            return;
+                        }
 
-                if (!hasLayer) {
-                    pr.addLayer(new PlayerChestLayer(pr));
-                    needSync = true;
+                        if (!hasLayer) {
+                            pr.addLayer(new PlayerChestLayer(pr));
+                        }
+                    }
                 }
             }
-        }
-
-        boolean hasArmor = !mc.player.getItemBySlot(EquipmentSlot.CHEST).isEmpty();
-        if (hasArmor != lastHasArmor) {
-            lastHasArmor = hasArmor;
-            needSync = true;
-        }
-
-        if (needSync) {
-            mc.player.getCapability(RPGCapability.INSTANCE).ifPresent(cap -> {
-                RPGNetwork.CHANNEL.sendToServer(new RPGNetwork.PacketFinishSetup(
-                        "",
-                        cap.getGender(), cap.getWidth(), cap.getHeight(), cap.getChest(),
-                        cap.getChestY(), cap.getChestSep(), cap.getChestAng(), cap.isPhysicsEnabled(),
-                        "",
-                        new CompoundTag(),
-                        false
-                ));
-            });
-        }
+        });
     }
 
     @SubscribeEvent
@@ -354,21 +383,14 @@ public class ClientHooks {
             if (mc.screen != null) return;
 
             int k = event.getKey();
+
             if (k == mc.options.keyChat.getKey().getValue() ||
                     k == mc.options.keyCommand.getKey().getValue()) {
                 return;
             }
 
-            if (k == InputConstants.KEY_ESCAPE) {
-                if (event.getAction() == InputConstants.PRESS) {
-                    IntroAnimation.skip();
-                }
-                event.setCanceled(true);
-                return;
-            }
-
-            if (!IntroAnimation.isPaused()) {
-                event.setCanceled(true);
+            if (k == InputConstants.KEY_ESCAPE && event.getAction() == InputConstants.PRESS) {
+                IntroAnimation.skip();
             }
         }
     }
@@ -416,7 +438,7 @@ public class ClientHooks {
     @SubscribeEvent
     public static void onRenderPlayerPost(RenderPlayerEvent.Post event) {
         PlayerRenderer renderer = event.getRenderer();
-        PlayerModel<net.minecraft.client.player.AbstractClientPlayer> model = renderer.getModel();
+        PlayerModel<AbstractClientPlayer> model = renderer.getModel();
         model.head.visible = true;
         model.hat.visible = true;
         model.leftArm.visible = true;

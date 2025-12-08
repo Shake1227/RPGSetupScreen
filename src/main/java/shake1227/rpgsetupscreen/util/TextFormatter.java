@@ -1,37 +1,45 @@
 package shake1227.rpgsetupscreen.util;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 public class TextFormatter {
+
     public static String formatForNotification(String text) {
-        if (text == null) return "";
-        StringBuilder sb = new StringBuilder();
-        int lineLength = 0;
-        boolean inQuote = false;
-        String prohibited = "」』）)]}、。";
+        if (text == null || text.isEmpty()) return "";
+
+        StringBuilder formatted = new StringBuilder();
+        int length = 0;
+        boolean inBrackets = false;
 
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
-            sb.append(c);
-            lineLength++;
+            formatted.append(c);
+            length++;
 
-            if (c == '「') inQuote = true;
-            if (c == '」') inQuote = false;
+            if (c == '「') {
+                inBrackets = true;
+            } else if (c == '」') {
+                inBrackets = false;
+            }
 
-            boolean shouldBreak = false;
+            if (length >= 20 && (c == '、' || c == '。')) {
+                if (!inBrackets) {
+                    if (i + 1 < text.length() && text.charAt(i + 1) == '」') {
+                        continue;
+                    }
 
-            if (lineLength >= 20) shouldBreak = true;
-            else if (c == '。' || c == '、') shouldBreak = true;
-
-            if (shouldBreak) {
-                if (i + 1 < text.length()) {
-                    char next = text.charAt(i + 1);
-                    if (prohibited.indexOf(next) >= 0) continue;
-                    if (inQuote && lineLength >= 20 && c != '。' && c != '、') continue;
-
-                    sb.append("&u");
-                    lineLength = 0;
+                    formatted.append("&u");
+                    length = 0;
                 }
             }
+
+            if (length >= 20 && c == '」' && !inBrackets) {
+                formatted.append("&u");
+                length = 0;
+            }
         }
-        return sb.toString();
+
+        return formatted.toString();
     }
 }

@@ -28,6 +28,8 @@
   "message.rpgsetupscreen.floppy_used": "設定を保存しました。",
   "command.rpgsetupscreen.reset_success": "%s のデータをリセットしました。次回ログイン時に設定画面が表示されます。",
   "command.rpgsetupscreen.reset_fail": "%s のデータが見つかりませんでした。",
+  "command.rpgsetupscreen.reload_success": "キャラクター設定を再読み込みしました。",
+  "command.rpgsetupscreen.reload_fail": "再読み込みに失敗しました。",
   "item.rpgsetupscreen.floppy_disk": "フロッピーディスク",
 
   "gui.rpgsetupscreen.manager.title": "画面管理",
