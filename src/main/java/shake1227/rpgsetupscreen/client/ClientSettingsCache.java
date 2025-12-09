@@ -1,98 +1,18 @@
 package shake1227.rpgsetupscreen.client;
 
 import net.minecraft.client.Minecraft;
-import net.minecraftforge.fml.loading.FMLPaths;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtIo;
 
-import java.io.*;
+import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 
 public class ClientSettingsCache {
-    private static final Map<String, CachedData> cache = new HashMap<>();
-    private static File file;
+    private static final Map<String, CachedData> cacheMap = new HashMap<>();
+    private static File saveFile;
 
-    public static boolean enableGender = true;
-    public static boolean enableWidth = true;
-    public static boolean enableHeight = true;
-    public static boolean enableChest = true;
-    public static boolean enableChestY = true;
-    public static boolean enableChestSep = true;
-    public static boolean enableChestAng = true;
-    public static boolean enablePhysics = true;
-
-    private static File getFile() {
-        if (file == null) {
-            file = FMLPaths.CONFIGDIR.get().resolve("rpgsetupscreen_client_cache.dat").toFile();
-        }
-        return file;
-    }
-
-    public static void init() {
-        getFile();
-        load();
-    }
-
-    public static void update(boolean g, boolean w, boolean h, boolean c, boolean cy, boolean cs, boolean ca, boolean phys) {
-        enableGender = g; enableWidth = w; enableHeight = h; enableChest = c;
-        enableChestY = cy; enableChestSep = cs; enableChestAng = ca; enablePhysics = phys;
-    }
-
-    @SuppressWarnings("unchecked")
-    public static void load() {
-        File f = getFile();
-        if (f.exists()) {
-            try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(f))) {
-                Map<String, CachedData> data = (Map<String, CachedData>) ois.readObject();
-                cache.clear();
-                cache.putAll(data);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
-    public static void save(int g, float w, float h, float c, float cy, float cs, float ca, boolean phys) {
-        String ip = getCurrentServerIP();
-        cache.put(ip, new CachedData(g, w, h, c, cy, cs, ca, phys));
-        saveToFile();
-    }
-
-    private static void saveToFile() {
-        File f = getFile();
-        try {
-            if (f.getParentFile() != null && !f.getParentFile().exists()) {
-                f.getParentFile().mkdirs();
-            }
-            try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(f))) {
-                oos.writeObject(cache);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    public static void clear() {
-        String ip = getCurrentServerIP();
-        if (cache.containsKey(ip)) {
-            cache.remove(ip);
-            saveToFile();
-        }
-    }
-
-    public static CachedData getForCurrentServer() {
-        return cache.get(getCurrentServerIP());
-    }
-
-    private static String getCurrentServerIP() {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.getCurrentServer() != null) {
-            return mc.getCurrentServer().ip;
-        }
-        return "singleplayer";
-    }
-
-    public static class CachedData implements Serializable {
-        private static final long serialVersionUID = 1L;
+    public static class CachedData {
         public int gender;
         public float width, height, chest, chestY, chestSep, chestAng;
         public boolean physics;
@@ -100,6 +20,83 @@ public class ClientSettingsCache {
         public CachedData(int g, float w, float h, float c, float cy, float cs, float ca, boolean phys) {
             this.gender = g; this.width = w; this.height = h; this.chest = c;
             this.chestY = cy; this.chestSep = cs; this.chestAng = ca; this.physics = phys;
+        }
+
+        public static CachedData fromNbt(CompoundTag tag) {
+            return new CachedData(
+                    tag.getInt("g"), tag.getFloat("w"), tag.getFloat("h"), tag.getFloat("c"),
+                    tag.getFloat("cy"), tag.getFloat("cs"), tag.getFloat("ca"), tag.getBoolean("p")
+            );
+        }
+
+        public CompoundTag toNbt() {
+            CompoundTag tag = new CompoundTag();
+            tag.putInt("g", gender); tag.putFloat("w", width); tag.putFloat("h", height);
+            tag.putFloat("c", chest); tag.putFloat("cy", chestY); tag.putFloat("cs", chestSep);
+            tag.putFloat("ca", chestAng); tag.putBoolean("p", physics);
+            return tag;
+        }
+    }
+
+    private static String getServerId() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null) {
+            return "SP_" + mc.getSingleplayerServer().getWorldData().getLevelName();
+        } else if (mc.getCurrentServer() != null) {
+            return "MP_" + mc.getCurrentServer().ip;
+        }
+        return "UNKNOWN";
+    }
+
+    public static void load() {
+        if (saveFile == null) {
+            saveFile = new File(Minecraft.getInstance().gameDirectory, "config/rpgsetupscreen_client_data.dat");
+        }
+        cacheMap.clear();
+        if (saveFile.exists()) {
+            try {
+                CompoundTag root = NbtIo.read(saveFile);
+                if (root != null) {
+                    for (String key : root.getAllKeys()) {
+                        cacheMap.put(key, CachedData.fromNbt(root.getCompound(key)));
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public static void save(int g, float w, float h, float c, float cy, float cs, float ca, boolean phys) {
+        String id = getServerId();
+        if (id.equals("UNKNOWN")) return;
+
+        cacheMap.put(id, new CachedData(g, w, h, c, cy, cs, ca, phys));
+        saveDisk();
+    }
+
+    private static void saveDisk() {
+        if (saveFile == null) return;
+        try {
+            CompoundTag root = new CompoundTag();
+            for (Map.Entry<String, CachedData> entry : cacheMap.entrySet()) {
+                root.put(entry.getKey(), entry.getValue().toNbt());
+            }
+            NbtIo.write(root, saveFile);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static CachedData getForCurrentServer() {
+        return cacheMap.get(getServerId());
+    }
+
+    public static void clearCurrentServer() {
+        String id = getServerId();
+        if (cacheMap.containsKey(id)) {
+            cacheMap.remove(id);
+            saveDisk();
         }
     }
 }

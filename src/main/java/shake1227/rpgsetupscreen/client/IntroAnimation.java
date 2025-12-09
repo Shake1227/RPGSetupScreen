@@ -53,9 +53,10 @@ public class IntroAnimation {
     public static void start(boolean skippable) { start(skippable, null); }
 
     public static void start(boolean skippable, Vec3 target) {
+        stop();
+
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
-        if (active) return;
 
         active = true;
         canSkip = skippable;
@@ -119,18 +120,23 @@ public class IntroAnimation {
     }
 
     public static void stop() {
-        if (!active) return;
         active = false;
         targetPos = null;
+        totalPausedTime = 0;
+        wasPaused = false;
 
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {
-            mc.setCameraEntity(mc.player);
+            if (mc.getCameraEntity() == cameraDummy) {
+                mc.setCameraEntity(mc.player);
+            }
         }
         cameraDummy = null;
 
-        mc.options.sensitivity().set(originalSensitivity);
-        mc.options.setCameraType(originalCameraType);
+        if (originalCameraType != null) {
+            mc.options.sensitivity().set(originalSensitivity);
+            mc.options.setCameraType(originalCameraType);
+        }
 
         if (onComplete != null) {
             onComplete.run();
@@ -181,7 +187,7 @@ public class IntroAnimation {
 
     private static void updateDummyPosition(long elapsed) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null) return;
+        if (mc.player == null || cameraDummy == null) return;
 
         float progress = Mth.clamp((float)elapsed / (float)DURATION_CAMERA, 0f, 1f);
         float t = progress < 0.5 ? 4 * progress * progress * progress : 1 - (float)Math.pow(-2 * progress + 2, 3) / 2;

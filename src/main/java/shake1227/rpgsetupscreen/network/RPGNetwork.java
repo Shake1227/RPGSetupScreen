@@ -110,7 +110,25 @@ public class RPGNetwork {
                 }
 
                 ServerPlayer targetPlayer = p;
-                if(!m.targetUUID.isEmpty() && p.hasPermissions(2)) { ServerPlayer t = p.server.getPlayerList().getPlayer(UUID.fromString(m.targetUUID)); if(t != null) targetPlayer = t; }
+                if(!m.targetUUID.isEmpty() && p.hasPermissions(2)) {
+                    UUID uuid = null;
+                    try {
+                        uuid = UUID.fromString(m.targetUUID);
+                    } catch (IllegalArgumentException e) {
+                        if (m.targetUUID.length() == 32) {
+                            try {
+                                String formatted = m.targetUUID.replaceFirst(
+                                        "(\\w{8})(\\w{4})(\\w{4})(\\w{4})(\\w{12})", "$1-$2-$3-$4-$5");
+                                uuid = UUID.fromString(formatted);
+                            } catch (Exception ignored) {}
+                        }
+                    }
+
+                    if (uuid != null) {
+                        ServerPlayer t = p.server.getPlayerList().getPlayer(uuid);
+                        if(t != null) targetPlayer = t;
+                    }
+                }
                 final ServerPlayer fp = targetPlayer;
 
                 fp.getCapability(RPGCapability.INSTANCE).ifPresent(cap -> {

@@ -47,8 +47,10 @@ public class ClientHooks {
     public static Vec3 pendingSpawnPosition = null;
 
     private static boolean pendingManagerOpen = false;
+    private static boolean hasCompletedSetup = false;
 
     private static int tickCounter = 0;
+    private static boolean lastHasArmor = false;
     private static boolean layerCheckFailed = false;
 
     public static void setPendingSetupData(int g, float w, float h, float c, float cy, float cs, float ca, boolean phys) {
@@ -114,6 +116,11 @@ public class ClientHooks {
         }
         Minecraft.getInstance().setScreen(null);
         pendingSetupOpen = false;
+        hasCompletedSetup = true;
+
+        // 修正点1: 第一引数を false にしてスキップ不可にする
+        // 修正点2: 第二引数を null にして、IntroAnimation側で現在のプレイヤー座標を取得させる（テレポート後の位置で再生）
+        playIntro(false, null);
 
         String locName = pendingSpawnLocationName != null && !pendingSpawnLocationName.isEmpty() ? pendingSpawnLocationName : "???";
         IntroAnimation.setOnComplete(() -> {
@@ -125,8 +132,6 @@ public class ClientHooks {
                     6
             );
         });
-
-        playIntro(false, pendingSpawnPosition);
     }
 
     public static void showClientNotification(String translationKey, String category) {
@@ -140,16 +145,36 @@ public class ClientHooks {
     @SubscribeEvent
     public static void onClientLogin(ClientPlayerNetworkEvent.LoggingIn event) {
         introPlayedSession = false;
+        hasCompletedSetup = false;
         ClientSettingsCache.load();
         accumulatedInputs = new CompoundTag();
         pendingManagerOpen = false;
         pendingSetupOpen = false;
         layerCheckFailed = false;
+        IntroAnimation.stop();
+
+        if (Minecraft.getInstance().player != null) {
+            lastHasArmor = !Minecraft.getInstance().player.getItemBySlot(EquipmentSlot.CHEST).isEmpty();
+        }
+
+        ClientSettingsCache.CachedData cached = ClientSettingsCache.getForCurrentServer();
+        if (cached != null) {
+            RPGNetwork.CHANNEL.sendToServer(new RPGNetwork.PacketFinishSetup(
+                    "", cached.gender, cached.width, cached.height, cached.chest, cached.chestY, cached.chestSep, cached.chestAng, cached.physics,
+                    Minecraft.getInstance().getUser().getUuid(),
+                    new CompoundTag(), false
+            ));
+            hasCompletedSetup = true;
+            pendingSetupOpen = false;
+        } else {
+            pendingSetupOpen = true;
+        }
     }
 
     @SubscribeEvent
     public static void onClientLogout(ClientPlayerNetworkEvent.LoggingOut event) {
         introPlayedSession = false;
+        hasCompletedSetup = false;
         screenDefs.clear();
         accumulatedInputs = new CompoundTag();
         pendingData = null;
@@ -158,6 +183,7 @@ public class ClientHooks {
         pendingManagerOpen = false;
         pendingSetupOpen = false;
         layerCheckFailed = false;
+        IntroAnimation.stop();
     }
 
     @SubscribeEvent
@@ -168,16 +194,25 @@ public class ClientHooks {
                             try {
                                 Minecraft mc = Minecraft.getInstance();
                                 if (mc.player != null) {
-                                    mc.player.getCapability(RPGCapability.INSTANCE).ifPresent(cap -> {
+                                    ClientSettingsCache.CachedData cached = ClientSettingsCache.getForCurrentServer();
+                                    if (cached != null) {
                                         RPGNetwork.CHANNEL.sendToServer(new RPGNetwork.PacketFinishSetup(
-                                                "",
-                                                cap.getGender(), cap.getWidth(), cap.getHeight(), cap.getChest(),
-                                                cap.getChestY(), cap.getChestSep(), cap.getChestAng(), cap.isPhysicsEnabled(),
-                                                mc.player.getStringUUID(),
-                                                new CompoundTag(),
-                                                false
+                                                "", cached.gender, cached.width, cached.height, cached.chest,
+                                                cached.chestY, cached.chestSep, cached.chestAng, cached.physics,
+                                                mc.player.getStringUUID(), new CompoundTag(), false
                                         ));
-                                    });
+                                    } else {
+                                        mc.player.getCapability(RPGCapability.INSTANCE).ifPresent(cap -> {
+                                            RPGNetwork.CHANNEL.sendToServer(new RPGNetwork.PacketFinishSetup(
+                                                    "",
+                                                    cap.getGender(), cap.getWidth(), cap.getHeight(), cap.getChest(),
+                                                    cap.getChestY(), cap.getChestSep(), cap.getChestAng(), cap.isPhysicsEnabled(),
+                                                    mc.player.getStringUUID(),
+                                                    new CompoundTag(),
+                                                    false
+                                            ));
+                                        });
+                                    }
 
                                     String key = "command.rpgsetupscreen.reload_success";
                                     if (ModernNotificationHandler.IS_LOADED) {
@@ -212,9 +247,23 @@ public class ClientHooks {
                 if (player == mc.player) {
                     if (finished) {
                         pendingSetupOpen = false;
+                        hasCompletedSetup = true;
                         if (!introPlayedSession) playIntro(true, null);
                     } else {
-                        pendingSetupOpen = true;
+                        ClientSettingsCache.CachedData cached = ClientSettingsCache.getForCurrentServer();
+                        if (cached != null) {
+                            RPGNetwork.CHANNEL.sendToServer(new RPGNetwork.PacketFinishSetup(
+                                    "", cached.gender, cached.width, cached.height, cached.chest,
+                                    cached.chestY, cached.chestSep, cached.chestAng, cached.physics,
+                                    mc.player.getStringUUID(), new CompoundTag(), false
+                            ));
+                            pendingSetupOpen = false;
+                            hasCompletedSetup = true;
+                        } else {
+                            if (!hasCompletedSetup) {
+                                pendingSetupOpen = true;
+                            }
+                        }
                     }
                 }
             });
@@ -222,12 +271,14 @@ public class ClientHooks {
     }
 
     public static void handleForceReset() {
-        ClientSettingsCache.clear();
+        ClientSettingsCache.clearCurrentServer();
         introPlayedSession = false;
+        hasCompletedSetup = false;
         accumulatedInputs = new CompoundTag();
         pendingSpawnLocationName = "";
         pendingSpawnPosition = null;
         pendingSetupOpen = true;
+        IntroAnimation.stop();
     }
 
     public static void playIntro(boolean skippable, Vec3 targetPos) {
@@ -267,9 +318,10 @@ public class ClientHooks {
 
     public static void openAdmin(List<RPGCommands.SpawnData.Entry> list) {
         var mc = Minecraft.getInstance();
-        float w = 1f, h = 1f, c = 0f, cy = 0f, cs = 0f, ca = 0f; int g = 0; boolean phys = true;
-        if (pendingData != null) { w = pendingData.width; h = pendingData.height; c = pendingData.chest; cy = pendingData.chestY; cs = pendingData.chestSep; ca = pendingData.chestAng; g = pendingData.gender; phys = pendingData.physics; }
-        else if (mc.player != null) { var cap = mc.player.getCapability(RPGCapability.INSTANCE).orElse(null); if (cap != null) { w = cap.getWidth(); h = cap.getHeight(); c = cap.getChest(); cy = cap.getChestY(); cs = cap.getChestSep(); ca = cap.getChestAng(); g = cap.getGender(); phys = cap.isPhysicsEnabled(); } }
+        ClientSettingsCache.CachedData d = ClientSettingsCache.getForCurrentServer();
+        float w=1f,h=1f,c=0f,cy=0f,cs=0f,ca=0f; int g=0; boolean phys=true;
+        if(d!=null){ w=d.width; h=d.height; c=d.chest; cy=d.chestY; cs=d.chestSep; ca=d.chestAng; g=d.gender; phys=d.physics; }
+        else if(mc.player!=null) { var cap=mc.player.getCapability(RPGCapability.INSTANCE).orElse(null); if(cap!=null){ w=cap.getWidth(); h=cap.getHeight(); c=cap.getChest(); cy=cap.getChestY(); cs=cap.getChestSep(); ca=cap.getChestAng(); g=cap.getGender(); phys=cap.isPhysicsEnabled(); } }
         mc.setScreen(new ScreenSpawn(list, g, w, h, c, cy, cs, ca, phys));
     }
 
@@ -345,7 +397,6 @@ public class ClientHooks {
                             List<?> layers = (List<?>) layersField.get(pr);
                             hasLayer = layers.stream().anyMatch(l -> l instanceof PlayerChestLayer);
                         } catch (Exception e) {
-                            System.out.println("[RPGSetupScreen] Failed to access renderer layers: " + e.getMessage());
                             layerCheckFailed = true;
                             return;
                         }
@@ -355,6 +406,11 @@ public class ClientHooks {
                         }
                     }
                 }
+            }
+
+            boolean hasArmor = !mc.player.getItemBySlot(EquipmentSlot.CHEST).isEmpty();
+            if (hasArmor != lastHasArmor) {
+                lastHasArmor = hasArmor;
             }
         });
     }

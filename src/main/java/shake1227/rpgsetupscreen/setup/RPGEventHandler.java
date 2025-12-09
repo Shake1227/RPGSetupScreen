@@ -66,16 +66,23 @@ public class RPGEventHandler {
             }
 
             RPGCommands.ResetData resetData = RPGCommands.ResetData.get(player.serverLevel());
+            // ログインしたプレイヤーがリセット対象かどうかチェック
             boolean shouldReset = resetData.remove(player.getUUID());
 
             player.getCapability(RPGCapability.INSTANCE).ifPresent(cap -> {
-                if (shouldReset) cap.setFinished(false);
+                if (shouldReset) {
+                    cap.setFinished(false);
+                    // リセット対象の場合は、まず強制リセット信号を送る
+                    // これによりクライアント側のキャッシュも削除される
+                    RPGNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new RPGNetwork.PacketForceReset());
+                }
+
+                // その後、最新の状態（リセット後は未設定、それ以外は既存データ）を送信する
                 RPGNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
                         new RPGNetwork.PacketSyncData(player.getId(), cap.isFinished(), cap.getGender(), cap.getWidth(), cap.getHeight(), cap.getChest(), cap.getChestY(), cap.getChestSep(), cap.getChestAng(), cap.isPhysicsEnabled()));
 
-                if (!cap.isFinished()) {
+                if (!cap.isFinished() && shouldReset) {
                     player.setGameMode(GameType.SPECTATOR);
-                    RPGNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new RPGNetwork.PacketForceReset());
                 }
             });
         }
@@ -103,10 +110,14 @@ public class RPGEventHandler {
 
     @SubscribeEvent
     public void onPlayerClone(PlayerEvent.Clone event) {
+        event.getOriginal().reviveCaps();
+
         event.getOriginal().getCapability(RPGCapability.INSTANCE).ifPresent(oldCap ->
                 event.getEntity().getCapability(RPGCapability.INSTANCE).ifPresent(newCap ->
                         newCap.copyFrom(oldCap)
                 )
         );
+
+        event.getOriginal().invalidateCaps();
     }
 }
