@@ -24,7 +24,7 @@ public class IntroAnimation {
     private static Runnable onComplete = null;
 
     private static RemotePlayer cameraDummy;
-    private static Vec3 startCamPos;
+    private static Vec3 relativeCamOffset;
     private static float startYRot;
     private static float startXRot;
     private static Vec3 targetPos = null;
@@ -32,7 +32,7 @@ public class IntroAnimation {
     private static double originalSensitivity;
     private static CameraType originalCameraType;
 
-    private static final long DELAY_CURTAIN = 200;
+    private static final long DELAY_CURTAIN = 1000;
     private static final long DURATION_CURTAIN = 2500;
     private static final long DURATION_CAMERA = 15000;
     private static final long DURATION_WAIT = 3500;
@@ -48,6 +48,7 @@ public class IntroAnimation {
     private static long pauseStart = 0;
     private static long totalPausedTime = 0;
     private static boolean wasPaused = false;
+    private static boolean firstFrame = true;
 
     public static void start() { start(true, null); }
     public static void start(boolean skippable) { start(skippable, null); }
@@ -64,6 +65,7 @@ public class IntroAnimation {
         startTime = System.currentTimeMillis();
         totalPausedTime = 0;
         wasPaused = false;
+        firstFrame = true;
 
         originalSensitivity = mc.options.sensitivity().get();
         originalCameraType = mc.options.getCameraType();
@@ -84,8 +86,7 @@ public class IntroAnimation {
         double offsetX = -Math.sin(rad) * dist;
         double offsetZ = Math.cos(rad) * dist;
 
-        Vec3 basePos = targetPos != null ? targetPos : mc.player.getPosition(1.0f);
-        startCamPos = basePos.add(offsetX, offsetY, offsetZ);
+        relativeCamOffset = new Vec3(offsetX, offsetY, offsetZ);
 
         startYRot = playerYRot + 150.0F;
         startXRot = -15.0F;
@@ -194,9 +195,9 @@ public class IntroAnimation {
 
         Vec3 endPos = targetPos != null ? targetPos : mc.player.getPosition(1.0f);
 
-        double curX = Mth.lerp(t, startCamPos.x, endPos.x);
-        double curY = Mth.lerp(t, startCamPos.y, endPos.y);
-        double curZ = Mth.lerp(t, startCamPos.z, endPos.z);
+        double curX = endPos.x + (1 - t) * relativeCamOffset.x;
+        double curY = endPos.y + (1 - t) * relativeCamOffset.y;
+        double curZ = endPos.z + (1 - t) * relativeCamOffset.z;
 
         float endYRot = mc.player.getYRot();
         float endXRot = mc.player.getXRot();
@@ -220,6 +221,11 @@ public class IntroAnimation {
     public static void render(GuiGraphics g, int width, int height) {
         if (!active) return;
 
+        if (firstFrame) {
+            startTime = System.currentTimeMillis();
+            firstFrame = false;
+        }
+
         long current = System.currentTimeMillis();
         long elapsed;
         if (wasPaused) {
@@ -230,7 +236,7 @@ public class IntroAnimation {
         elapsed = Math.max(0, elapsed);
 
         g.pose().pushPose();
-        g.pose().translate(0, 0, 50);
+        g.pose().translate(0, 0, 400);
 
         if (canSkip) {
             g.drawString(Minecraft.getInstance().font, Component.translatable("gui.rpgsetupscreen.skip"), 10, 10, 0xFFFFFFFF, true);
@@ -240,10 +246,10 @@ public class IntroAnimation {
         int topBarBottomY = halfHeight;
         int bottomBarTopY = halfHeight;
 
-        g.setColor(0.25F, 0.25F, 0.25F, 1.0F);
+        g.setColor(1.0F, 1.0F, 1.0F, 1.0F);
 
         if (elapsed < DELAY_CURTAIN) {
-            g.blit(OPTIONS_BACKGROUND, 0, 0, 0, 0, width, height, 32, 32);
+            drawTiledBackground(g, 0, 0, width, height);
         } else {
             float curtainTime = elapsed - DELAY_CURTAIN;
             float curtainProgress = Mth.clamp(curtainTime / (float)DURATION_CURTAIN, 0f, 1f);
@@ -256,10 +262,10 @@ public class IntroAnimation {
             bottomBarTopY = halfHeight + openAmount;
 
             if (topBarBottomY > 0) {
-                g.blit(OPTIONS_BACKGROUND, 0, 0, 0, 0, width, topBarBottomY, 32, 32);
+                drawTiledBackground(g, 0, 0, width, topBarBottomY);
             }
             if (bottomBarTopY < height) {
-                g.blit(OPTIONS_BACKGROUND, 0, bottomBarTopY, 0, (float)bottomBarTopY, width, height - bottomBarTopY, 32, 32);
+                drawTiledBackground(g, 0, bottomBarTopY, width, height - bottomBarTopY);
             }
         }
 
@@ -301,6 +307,19 @@ public class IntroAnimation {
         }
 
         g.pose().popPose();
+    }
+
+    private static void drawTiledBackground(GuiGraphics g, int x, int y, int width, int height) {
+        g.setColor(0.25F, 0.25F, 0.25F, 1.0F);
+        int tileSize = 32;
+        for (int dx = 0; dx < width; dx += tileSize) {
+            for (int dy = 0; dy < height; dy += tileSize) {
+                int drawW = Math.min(tileSize, width - dx);
+                int drawH = Math.min(tileSize, height - dy);
+                g.blit(OPTIONS_BACKGROUND, x + dx, y + dy, 0, 0, drawW, drawH, 32, 32);
+            }
+        }
+        g.setColor(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
     private static void drawCustomGlitchText(GuiGraphics g, String text, int x, int y, float scale, float baseAlpha, float intensity) {

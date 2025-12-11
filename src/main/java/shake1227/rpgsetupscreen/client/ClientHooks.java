@@ -118,9 +118,8 @@ public class ClientHooks {
         pendingSetupOpen = false;
         hasCompletedSetup = true;
 
-        // 修正点1: 第一引数を false にしてスキップ不可にする
-        // 修正点2: 第二引数を null にして、IntroAnimation側で現在のプレイヤー座標を取得させる（テレポート後の位置で再生）
-        playIntro(false, null);
+        IntroAnimation.start(false, null);
+        introPlayedSession = true;
 
         String locName = pendingSpawnLocationName != null && !pendingSpawnLocationName.isEmpty() ? pendingSpawnLocationName : "???";
         IntroAnimation.setOnComplete(() -> {
@@ -157,18 +156,7 @@ public class ClientHooks {
             lastHasArmor = !Minecraft.getInstance().player.getItemBySlot(EquipmentSlot.CHEST).isEmpty();
         }
 
-        ClientSettingsCache.CachedData cached = ClientSettingsCache.getForCurrentServer();
-        if (cached != null) {
-            RPGNetwork.CHANNEL.sendToServer(new RPGNetwork.PacketFinishSetup(
-                    "", cached.gender, cached.width, cached.height, cached.chest, cached.chestY, cached.chestSep, cached.chestAng, cached.physics,
-                    Minecraft.getInstance().getUser().getUuid(),
-                    new CompoundTag(), false
-            ));
-            hasCompletedSetup = true;
-            pendingSetupOpen = false;
-        } else {
-            pendingSetupOpen = true;
-        }
+        RPGNetwork.CHANNEL.sendToServer(new RPGNetwork.PacketRequestSync());
     }
 
     @SubscribeEvent
@@ -218,7 +206,7 @@ public class ClientHooks {
                                     if (ModernNotificationHandler.IS_LOADED) {
                                         ModernNotificationHandler.showClientNotification(key, "success");
                                     } else {
-                                        mc.player.sendSystemMessage(Component.translatable(key));
+                                        mc.player.sendSystemMessage(ChatUtil.translate(key));
                                     }
                                 }
                             } catch (Exception e) {
@@ -228,7 +216,7 @@ public class ClientHooks {
                                     ModernNotificationHandler.showClientNotification(key, "failure");
                                 } else {
                                     if (Minecraft.getInstance().player != null) {
-                                        Minecraft.getInstance().player.sendSystemMessage(Component.translatable(key));
+                                        Minecraft.getInstance().player.sendSystemMessage(ChatUtil.translate(key));
                                     }
                                 }
                             }
@@ -248,7 +236,10 @@ public class ClientHooks {
                     if (finished) {
                         pendingSetupOpen = false;
                         hasCompletedSetup = true;
-                        if (!introPlayedSession) playIntro(true, null);
+                        if (!introPlayedSession && !IntroAnimation.isActive()) {
+                            introPlayedSession = true;
+                            IntroAnimation.start(true, null);
+                        }
                     } else {
                         ClientSettingsCache.CachedData cached = ClientSettingsCache.getForCurrentServer();
                         if (cached != null) {
@@ -279,17 +270,6 @@ public class ClientHooks {
         pendingSpawnPosition = null;
         pendingSetupOpen = true;
         IntroAnimation.stop();
-    }
-
-    public static void playIntro(boolean skippable, Vec3 targetPos) {
-        if (!introPlayedSession) {
-            introPlayedSession = true;
-            IntroAnimation.start(skippable, targetPos);
-        }
-    }
-
-    public static void playIntro(boolean skippable) {
-        playIntro(skippable, null);
     }
 
     public static void openSetup() {

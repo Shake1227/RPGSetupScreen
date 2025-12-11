@@ -1,6 +1,5 @@
 package shake1227.rpgsetupscreen.setup;
 
-import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
@@ -12,54 +11,63 @@ import net.minecraft.commands.arguments.coordinates.Vec3Argument;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtIo;
-import net.minecraft.nbt.StringTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.network.PacketDistributor;
+import shake1227.rpgsetupscreen.RPGSetupScreen;
 import shake1227.rpgsetupscreen.network.RPGNetwork;
 import shake1227.rpgsetupscreen.util.ModernNotificationHandler;
 
-import java.io.File;
+import java.io.*;
 import java.lang.reflect.Field;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
+@Mod.EventBusSubscriber(modid = RPGSetupScreen.MODID)
 public class RPGCommands {
 
     @SubscribeEvent
-    public void onRegisterCommands(RegisterCommandsEvent event) {
+    public static void onRegisterCommands(RegisterCommandsEvent event) {
+        RPGCommands instance = new RPGCommands();
         event.getDispatcher().register(Commands.literal("rpgsetupscreen")
                 .requires(s -> s.hasPermission(2))
                 .then(Commands.literal("locate")
                         .then(Commands.literal("add")
                                 .then(Commands.argument("name", StringArgumentType.string())
                                         .then(Commands.argument("pos", Vec3Argument.vec3())
-                                                .executes(this::addLoc))))
+                                                .executes(instance::addLoc))))
                         .then(Commands.literal("remove")
                                 .then(Commands.argument("name", StringArgumentType.string())
-                                        .executes(this::removeLoc)))
+                                        .executes(instance::removeLoc)))
                         .then(Commands.literal("gui")
-                                .executes(this::openGui))
+                                .executes(instance::openGui))
                 )
                 .then(Commands.literal("resetup")
                         .then(Commands.argument("target", EntityArgument.player())
                                 .then(Commands.argument("viewer", EntityArgument.player())
-                                        .executes(this::resetupPlayer)))
+                                        .executes(instance::resetupPlayer)))
                 )
                 .then(Commands.literal("resetdata")
                         .then(Commands.argument("targetName", StringArgumentType.string())
                                 .suggests(SUGGEST_KNOWN_PLAYERS)
-                                .executes(this::resetData)))
+                                .executes(instance::resetData)))
                 .then(Commands.literal("edit")
-                        .executes(this::openEditGui))
+                        .executes(instance::openEditGui))
         );
 
         event.getDispatcher().register(Commands.literal("reloadmydata")
-                .executes(this::reloadMyData));
+                .executes(instance::reloadMyData));
+    }
+
+    public static boolean checkAndRemoveFromResetList(MinecraftServer server, UUID uuid) {
+        return ResetFileHandler.checkAndRemove(server, uuid);
     }
 
     private static final SuggestionProvider<CommandSourceStack> SUGGEST_KNOWN_PLAYERS = (ctx, builder) -> {
@@ -141,14 +149,22 @@ public class RPGCommands {
         if (onlinePlayer != null) {
             onlinePlayer.getCapability(RPGCapability.INSTANCE).ifPresent(cap -> {
                 cap.setFinished(false);
+                cap.setGender(0);
+                cap.setWidth(1.0f);
+                cap.setHeight(1.0f);
+                cap.setChest(0.0f);
+                cap.setChestY(0.0f);
+                cap.setChestSep(0.0f);
+                cap.setChestAng(0.0f);
+                cap.setPhysicsEnabled(true);
+
                 RPGNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> onlinePlayer), new RPGNetwork.PacketForceReset());
                 RPGNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> onlinePlayer),
                         new RPGNetwork.PacketSyncData(onlinePlayer.getId(), false, 0, 1f, 1f, 0f, 0f, 0f, 0f, true));
             });
         }
 
-        ResetData resetData = ResetData.get(server.overworld());
-        resetData.add(id);
+        ResetFileHandler.add(server, id);
 
         if (onlinePlayer == null) {
             try {
@@ -225,23 +241,57 @@ public class RPGCommands {
         public static class Entry { public String name; public double x, y, z; public Entry(String n, double x, double y, double z) { this.name=n; this.x=x; this.y=y; this.z=z; } }
     }
 
-    public static class ResetData extends SavedData {
-        private final Set<UUID> pendingResets = new HashSet<>();
-        public static ResetData get(net.minecraft.server.level.ServerLevel level) { return level.getServer().overworld().getDataStorage().computeIfAbsent(ResetData::new, ResetData::new, "rpg_reset_list"); }
-        public ResetData() {}
-        public ResetData(CompoundTag tag) {
-            ListTag list = tag.getList("pending", 8);
-            for (int i = 0; i < list.size(); i++) {
-                try { pendingResets.add(UUID.fromString(list.getString(i))); } catch (IllegalArgumentException ignored) {}
+    private static class ResetFileHandler {
+        private static final String FILENAME = "rpgsetupscreen_resetdataplayer.txt";
+
+        private static File getFile(MinecraftServer server) {
+            return server.getWorldPath(new LevelResource("serverconfig")).resolve(FILENAME).toFile();
+        }
+
+        public static void add(MinecraftServer server, UUID uuid) {
+            List<String> lines = readAll(server);
+            String idStr = uuid.toString();
+            if (!lines.contains(idStr)) {
+                lines.add(idStr);
+                writeAll(server, lines);
             }
         }
-        @Override public CompoundTag save(CompoundTag tag) {
-            ListTag list = new ListTag();
-            for (UUID uuid : pendingResets) { list.add(StringTag.valueOf(uuid.toString())); }
-            tag.put("pending", list);
-            return tag;
+
+        public static boolean checkAndRemove(MinecraftServer server, UUID uuid) {
+            List<String> lines = readAll(server);
+            String idStr = uuid.toString();
+            if (lines.contains(idStr)) {
+                lines.remove(idStr);
+                writeAll(server, lines);
+                return true;
+            }
+            return false;
         }
-        public void add(UUID uuid) { if (pendingResets.add(uuid)) setDirty(); }
-        public boolean remove(UUID uuid) { boolean removed = pendingResets.remove(uuid); if (removed) setDirty(); return removed; }
+
+        private static List<String> readAll(MinecraftServer server) {
+            File f = getFile(server);
+            List<String> list = new ArrayList<>();
+            if (!f.exists()) return list;
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(f), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    if (!line.trim().isEmpty()) list.add(line.trim());
+                }
+            } catch (Exception e) { e.printStackTrace(); }
+            return list;
+        }
+
+        private static void writeAll(MinecraftServer server, List<String> lines) {
+            File f = getFile(server);
+            try {
+                if (!f.getParentFile().exists()) f.getParentFile().mkdirs();
+                try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(f), StandardCharsets.UTF_8))) {
+                    for (String s : lines) {
+                        bw.write(s);
+                        bw.newLine();
+                    }
+                }
+            } catch (Exception e) { e.printStackTrace(); }
+        }
     }
 }

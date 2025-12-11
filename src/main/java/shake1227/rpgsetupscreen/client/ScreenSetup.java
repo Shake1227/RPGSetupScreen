@@ -156,6 +156,11 @@ public class ScreenSetup extends Screen {
 
             if (fromFloppy) {
                 RPGNetwork.CHANNEL.sendToServer(new RPGNetwork.PacketFinishSetup("", gender, valW, valH, valC, valY, valSep, valAng, physicsEnabled, targetUUID, new net.minecraft.nbt.CompoundTag(), true));
+
+                if (this.minecraft != null && this.minecraft.player != null) {
+                    this.minecraft.player.displayClientMessage(ChatUtil.translate("message.rpgsetupscreen.floppy_used"), true);
+                }
+
                 this.onClose();
                 return;
             }
